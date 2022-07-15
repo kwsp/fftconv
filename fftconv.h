@@ -157,7 +157,7 @@ void convolve1d_ref(const double *a, const size_t a_size, const double *b,
   fftw_destroy_plan(plan_backward);
 }
 
-vector<double> convolve1d_ref(vector<double> &a, vector<double> &b) {
+vector<double> convolve1d_ref(const vector<double> &a, const vector<double> &b) {
   int padded_length = a.size() + b.size() - 1;
   vector<double> result(padded_length);
   convolve1d_ref(a.data(), a.size(), b.data(), b.size(), result.data());
@@ -221,7 +221,7 @@ void convolve1d(const double *a, const size_t a_size, const double *b,
   fftw_free(complex_buf_b);
 }
 
-vector<double> convolve1d(vector<double> &a, vector<double> &b) {
+vector<double> convolve1d(const vector<double> &a, const vector<double> &b) {
   int padded_length = a.size() + b.size() - 1;
   vector<double> result(padded_length);
   convolve1d(a.data(), a.size(), b.data(), b.size(), result.data());
