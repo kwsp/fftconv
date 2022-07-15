@@ -1,8 +1,9 @@
 #pragma once
 #include <cassert>
 #include <complex>
-#include <memory>
 #include <map>
+#include <memory>
+#include <shared_mutex>
 #include <vector>
 
 #include <fftw3.h>
@@ -11,7 +12,8 @@ namespace fftconv {
 using std::vector;
 
 // fftconv_plans manages the memory of the forward and backward fft plans
-// Assume the same FFTW plan will be used many times (use FFTW_MEASURE to compute optimal plan)
+// Assume the same FFTW plan will be used many times (use FFTW_MEASURE to
+// compute optimal plan)
 struct fftconv_plans {
   fftw_plan forward;
   fftw_plan backward;
@@ -41,17 +43,45 @@ struct fftconv_plans {
 };
 
 // Global cache of FFTW plans
-std::map<size_t, std::shared_ptr<fftconv_plans>> _fftconv_plans_cache;
+// Thread-safe
+class FFTW_PLAN_STORE {
+public:
+  //static FFTW_PLAN_STORE &Instance() {
+    //return instance;
+  //}
 
-std::shared_ptr<fftconv_plans> _get_fftconv_plans(size_t padded_size) {
-  auto it = _fftconv_plans_cache.find(padded_size);
-  if (it != _fftconv_plans_cache.end())
-    return it->second;
+  static std::shared_ptr<fftconv_plans> get(size_t size) {
+    static FFTW_PLAN_STORE instance;
+    //auto& instance = FFTW_PLAN_STORE::Instance();
+    if (auto plan = instance._get(size))
+      return plan;
+    return instance._get_set(size);
+  }
 
-  _fftconv_plans_cache[padded_size] =
-      std::make_shared<fftconv_plans>(padded_size);
-  return _fftconv_plans_cache[padded_size];
-}
+private:
+  FFTW_PLAN_STORE() = default;
+  ~FFTW_PLAN_STORE() = default;
+
+
+  std::shared_ptr<fftconv_plans> _get(size_t size) {
+    std::shared_lock read_lock(mutex_);
+    auto it = cache.find(size);
+    if (it != cache.end())
+      return it->second;
+    return nullptr;
+  }
+
+  std::shared_ptr<fftconv_plans> _get_set(size_t size) {
+    std::unique_lock write_lock(mutex_);
+    auto plan = std::make_shared<fftconv_plans>(size);
+    cache[size] = plan;
+    return plan;
+  }
+
+  // cache and mutex
+  std::map<size_t, std::shared_ptr<fftconv_plans>> cache;
+  mutable std::shared_mutex mutex_;
+};
 
 template <class T>
 vector<T> vector_elementwise_multiply(const vector<T> a, const vector<T> b) {
@@ -158,7 +188,8 @@ void convolve1d_ref(const double *a, const size_t a_size, const double *b,
   fftw_destroy_plan(plan_backward);
 }
 
-vector<double> convolve1d_ref(const vector<double> &a, const vector<double> &b) {
+vector<double> convolve1d_ref(const vector<double> &a,
+                              const vector<double> &b) {
   int padded_length = a.size() + b.size() - 1;
   vector<double> result(padded_length);
   convolve1d_ref(a.data(), a.size(), b.data(), b.size(), result.data());
@@ -179,7 +210,7 @@ void convolve1d(const double *a, const size_t a_size, const double *b,
   size_t complex_length = padded_length / 2 + 1;
 
   // Get cached plans
-  auto plans = _get_fftconv_plans(padded_length);
+  auto plans = FFTW_PLAN_STORE::get(padded_length);
 
   // Allocate fftw buffers for a
   double *real_buf = fftw_alloc_real(padded_length);
