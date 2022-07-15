@@ -1,4 +1,5 @@
-#pragma once
+#ifndef __FFTCONV_H__
+#define __FFTCONV_H__
 #include <cassert>
 #include <complex>
 #include <map>
@@ -29,9 +30,9 @@ struct fftconv_plans {
 
     // Compute the plans
     this->forward = fftw_plan_dft_r2c_1d(padded_length, real_buf, complex_buf,
-                                         FFTW_MEASURE);
+                                         FFTW_ESTIMATE);
     this->backward = fftw_plan_dft_c2r_1d(padded_length, complex_buf, real_buf,
-                                          FFTW_MEASURE);
+                                          FFTW_ESTIMATE);
 
     fftw_free(real_buf);
     fftw_free(complex_buf);
@@ -261,3 +262,4 @@ vector<double> convolve1d(const vector<double> &a, const vector<double> &b) {
 }
 
 } // namespace fftconv
+#endif  // __FFTCONV_H__
