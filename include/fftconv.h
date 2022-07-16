@@ -19,27 +19,34 @@ struct fftconv_plans {
   fftw_plan forward;
   fftw_plan backward;
 
+  // NOT THREAD-SAFE RIGHT NOW
+  double* real_buf;
+  fftw_complex* complex_buf_a;
+  fftw_complex* complex_buf_b;
+
   fftconv_plans(size_t padded_length) {
 
     // length of the complex arrays
     size_t complex_length = padded_length / 2 + 1;
 
     // Allocate temporary buffers for the purposes of creating the plans...
-    double *real_buf = fftw_alloc_real(padded_length);
-    fftw_complex *complex_buf = fftw_alloc_complex(complex_length);
+    real_buf = fftw_alloc_real(padded_length);
+    complex_buf_a = fftw_alloc_complex(complex_length);
+    complex_buf_b = fftw_alloc_complex(complex_length);
 
     // Compute the plans
-    this->forward = fftw_plan_dft_r2c_1d(padded_length, real_buf, complex_buf,
+    this->forward = fftw_plan_dft_r2c_1d(padded_length, real_buf, complex_buf_a,
                                          FFTW_ESTIMATE);
-    this->backward = fftw_plan_dft_c2r_1d(padded_length, complex_buf, real_buf,
+    this->backward = fftw_plan_dft_c2r_1d(padded_length, complex_buf_a, real_buf,
                                           FFTW_ESTIMATE);
 
-    fftw_free(real_buf);
-    fftw_free(complex_buf);
   }
   ~fftconv_plans() {
     fftw_destroy_plan(forward);
     fftw_destroy_plan(backward);
+    fftw_free(real_buf);
+    fftw_free(complex_buf_a);
+    fftw_free(complex_buf_b);
   }
 };
 
@@ -214,8 +221,11 @@ void convolve1d(const double *a, const size_t a_size, const double *b,
   auto plans = FFTW_PLAN_STORE::get(padded_length);
 
   // Allocate fftw buffers for a
-  double *real_buf = fftw_alloc_real(padded_length);
-  fftw_complex *complex_buf_a = fftw_alloc_complex(complex_length);
+  //double *real_buf = fftw_alloc_real(padded_length);
+  //fftw_complex *complex_buf_a = fftw_alloc_complex(complex_length);
+  double* const real_buf = plans->real_buf;
+  fftw_complex* const complex_buf_a = plans->complex_buf_a;
+  fftw_complex* const complex_buf_b = plans->complex_buf_b;
 
   // Copy a to buffer
   _copy_to_padded_buffer(a, a_size, real_buf, padded_length);
@@ -224,7 +234,7 @@ void convolve1d(const double *a, const size_t a_size, const double *b,
   fftw_execute_dft_r2c(plans->forward, real_buf, complex_buf_a);
 
   // Allocate fftw buffers for b
-  fftw_complex *complex_buf_b = fftw_alloc_complex(complex_length);
+  //fftw_complex *complex_buf_b = fftw_alloc_complex(complex_length);
 
   // Copy b to buffer. Reuse real buffer
   _copy_to_padded_buffer(b, b_size, real_buf, padded_length);
@@ -249,9 +259,9 @@ void convolve1d(const double *a, const size_t a_size, const double *b,
     result[i] = real_buf[i] / padded_length;
   }
 
-  fftw_free(real_buf);
-  fftw_free(complex_buf_a);
-  fftw_free(complex_buf_b);
+  //fftw_free(real_buf);
+  //fftw_free(complex_buf_a);
+  //fftw_free(complex_buf_b);
 }
 
 vector<double> convolve1d(const vector<double> &a, const vector<double> &b) {
