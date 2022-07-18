@@ -31,9 +31,8 @@ vector<double> convolve_naive(const vector<double> &a,
 
   for (int i = 0; i < conv_sz; ++i) {
     double sum = 0.0;
-    for (int j = 0; j <= i; ++j) {
+    for (int j = 0; j <= i; ++j)
       sum += ((j < n_a) && (i - j < n_b)) ? a[j] * b[i - j] : 0.0;
-    }
     result[i] = sum;
   }
   return result;
@@ -52,7 +51,7 @@ void timeit(string name, std::function<void()> callable, int n_runs = N_RUNS) {
 }
 
 // Wrapper to prevent it from being optimized away
-void arma_conv(arma::vec a, arma::vec b) {
+void arma_conv(const arma::vec &a, const arma::vec &b) {
   volatile arma::vec res = arma::conv(a, b);
 }
 
@@ -77,7 +76,8 @@ void test_a_case(string fname) {
   timeit("convolve_naive", [&tc]() { return convolve_naive(tc.v1, tc.v2); });
   timeit("ffconv::convolve1d_ref",
          [&tc]() { return fftconv::convolve1d_ref(tc.v1, tc.v2); });
-  timeit("ffconv::convolve1d", [&tc]() { return fftconv::convolve1d(tc.v1, tc.v2); });
+  timeit("ffconv::convolve1d",
+         [&tc]() { return fftconv::convolve1d(tc.v1, tc.v2); });
   timeit("arma::conv",
          [&arma_v1, &arma_v2]() { return arma_conv(arma_v1, arma_v2); });
 }
