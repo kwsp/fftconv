@@ -25,24 +25,25 @@ Install Cython, then run `python3 setup.py build_ext -i` to build the extension.
 **C++**. 1D convolution in `fftconv` is more than 2x faster than the Armadillo implementation.
 
 ```
-=== test_case_1.txt (1664, 65)  ===
+./build/fftconv_test
+=== test case (1664, 65) ===
 Vectors are equal.
 Vectors are equal.
-    (5000 runs) convolve_naive took 6821ms
-    (5000 runs) ffconv::convolve1d took 45ms
-    (5000 runs) arma::conv took 109ms
-=== test_case_2.txt (2816, 65)  ===
+    (5000 runs) ffconv::convolve1d_ref took 223ms
+    (5000 runs) ffconv::convolve1d took 49ms
+    (5000 runs) arma::conv took 110ms
+=== test case (2816, 65) ===
 Vectors are equal.
 Vectors are equal.
-    (5000 runs) convolve_naive took 19177ms
-    (5000 runs) ffconv::convolve1d took 82ms
+    (5000 runs) ffconv::convolve1d_ref took 246ms
+    (5000 runs) ffconv::convolve1d took 86ms
     (5000 runs) arma::conv took 183ms
-=== test_case_3.txt (10, 5)  ===
+=== test case (2000, 2000) ===
 Vectors are equal.
 Vectors are equal.
-    (5000 runs) convolve_naive took 0ms
-    (5000 runs) ffconv::convolve1d took 0ms
-    (5000 runs) arma::conv took 0ms
+    (5000 runs) ffconv::convolve1d_ref took 886ms
+    (5000 runs) ffconv::convolve1d took 667ms
+    (5000 runs) arma::conv took 17440ms
 ```
 
 **Python**. 1D convolution with `fftconv` is more than 2x faster than Numpy, and the speed gains are more significant the large the input arrays.
@@ -50,16 +51,16 @@ Vectors are equal.
 ```
 === test case (1664, 65) ===
 Vectors are equal.
-    (5000 runs) fftconv: 67.57 ms
-    (5000 runs) np.conv: 151.07 ms
+    (5000 runs) fftconv took 56ms
+    (5000 runs) np.conv took 149ms
 === test case (2816, 65) ===
 Vectors are equal.
-    (5000 runs) fftconv: 92.30 ms
-    (5000 runs) np.conv: 244.77 ms
+    (5000 runs) fftconv took 93ms
+    (5000 runs) np.conv took 247ms
 === test case (2000, 2000) ===
 Vectors are equal.
-    (5000 runs) fftconv: 669.90 ms
-    (5000 runs) np.conv: 8267.93 ms
+    (5000 runs) fftconv took 658ms
+    (5000 runs) np.conv took 8285ms
 ```
 
 The Python wrapper is almost as fast as the C++ code, as it has very little overhead.
