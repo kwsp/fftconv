@@ -1,6 +1,7 @@
 #include "fftconv.h"
-
-namespace fftconv {
+#include <memory>
+#include <shared_mutex>
+#include <unordered_map>
 
 // fftconv_plans manages the memory of the forward and backward fft plans
 // Assume the same FFTW plan will be used many times (use FFTW_MEASURE to
@@ -42,27 +43,33 @@ fftconv_plans::fftconv_plans(size_t padded_length) {
                                         FFTW_ESTIMATE);
 }
 
+// Thread-local hash map cache to store fftw plans and buffers.
+// The thread-local is mainly to make the buffers reusable
+// This does mean we need to compute the same plan in all threads
 thread_local std::unordered_map<size_t, std::shared_ptr<fftconv_plans>> _cache;
+// Mutex - fftw plan computation is not thread-safe by default
 std::shared_mutex _mutex;
 
 std::shared_ptr<fftconv_plans> _get_plans(size_t size) {
   std::shared_ptr<fftconv_plans> plans;
   {
     // _cache is thread_local so we don't need a read lock to access
-    //std::shared_lock read_lock(_mutex);
+    // std::shared_lock read_lock(_mutex);
     auto it = _cache.find(size);
     if (it != _cache.end())
       plans = it->second;
   }
   if (plans == nullptr) {
-    // We need an exclusive lock to access the cache because creation of fftw_plans
-    // is not thread-safe by default
+    // We need an exclusive lock to access the cache because creation of
+    // fftw_plans is not thread-safe by default
     std::unique_lock write_lock(_mutex);
     plans = std::make_shared<fftconv_plans>(size);
     _cache[size] = plans;
   }
   return plans;
 }
+
+namespace fftconv {
 
 void convolve1d(const double *a, const size_t a_size, const double *b,
                 const size_t b_size, double *result) {
@@ -108,4 +115,73 @@ void convolve1d(const double *a, const size_t a_size, const double *b,
     result[i] = real_buf[i] / padded_length;
   }
 }
+
+void convolve1d_ref(const double *a, const size_t a_size, const double *b,
+                    const size_t b_size, double *result) {
+  // length of the real arrays, including the final convolution output
+  size_t padded_length = a_size + b_size - 1;
+  // length of the complex arrays
+  size_t complex_length = padded_length / 2 + 1;
+
+  // Allocate fftw buffers for a
+  double *a_buf = fftw_alloc_real(padded_length);
+  fftw_complex *A_buf = fftw_alloc_complex(complex_length);
+
+  // Compute forward fft plan
+  fftw_plan plan_forward =
+      fftw_plan_dft_r2c_1d(padded_length, a_buf, A_buf, FFTW_ESTIMATE);
+
+  // Copy a to buffer
+  _copy_to_padded_buffer(a, a_size, a_buf, padded_length);
+
+  // Compute Fourier transform of vector a
+  fftw_execute_dft_r2c(plan_forward, a_buf, A_buf);
+
+  // Allocate fftw buffers for b
+  double *b_buf = fftw_alloc_real(padded_length);
+  fftw_complex *B_buf = fftw_alloc_complex(complex_length);
+
+  // Copy b to buffer
+  _copy_to_padded_buffer(b, b_size, b_buf, padded_length);
+
+  // Compute Fourier transform of vector b
+  fftw_execute_dft_r2c(plan_forward, b_buf, B_buf);
+
+  // Compute backward fft plan
+  fftw_complex *input_buffer = fftw_alloc_complex(complex_length);
+  double *output_buffer = fftw_alloc_real(padded_length);
+  fftw_plan plan_backward = fftw_plan_dft_c2r_1d(padded_length, input_buffer,
+                                                 output_buffer, FFTW_ESTIMATE);
+
+  // Perform element-wise product of FFT(a) and FFT(b)
+  // then compute inverse fourier transform.
+  vector_elementwise_multiply(
+      A_buf, B_buf, complex_length,
+      input_buffer); // A_buf becomes input to inverse conv
+
+  fftw_execute_dft_c2r(plan_backward, input_buffer, output_buffer);
+
+  // Normalize output
+  for (int i = 0; i < padded_length; i++) {
+    result[i] = output_buffer[i] / padded_length;
+  }
+
+  fftw_free(a_buf);
+  fftw_free(b_buf);
+  fftw_free(A_buf);
+  fftw_free(B_buf);
+  fftw_free(input_buffer);
+  fftw_free(output_buffer);
+  fftw_destroy_plan(plan_forward);
+  fftw_destroy_plan(plan_backward);
+}
+
+std::vector<double> convolve1d_ref(const vector<double> &a,
+                                   const vector<double> &b) {
+  int padded_length = a.size() + b.size() - 1;
+  vector<double> result(padded_length);
+  convolve1d_ref(a.data(), a.size(), b.data(), b.size(), result.data());
+  return result;
+}
+
 } // namespace fftconv
