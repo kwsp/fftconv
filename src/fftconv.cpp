@@ -75,7 +75,7 @@ std::shared_ptr<fftconv_plans> _get_plans(size_t size) {
   std::shared_ptr<fftconv_plans> plans;
   {
     // _cache is thread_local so we don't need a read lock to access
-    // std::shared_lock read_lock(_mutex);
+    std::shared_lock read_lock(_mutex);
     auto it = _cache.find(size);
     if (it != _cache.end())
       plans = it->second;
