@@ -37,3 +37,4 @@ test:
 .PHONY: clean
 clean:
 	rm -r $(BUILD_DIR)
+	rm *.so

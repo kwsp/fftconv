@@ -20,8 +20,6 @@ constexpr double err = 1e-6;
 
 // This function computes the discrete convolution of two arrays:
 // result[i] = a[i]*b[0] + a[i-1]*b[1] + ... + a[0]*b[i]
-// a and b can be vectors of different lengths, this function is careful to
-// never exceed the bounds of the vectors.
 vector<double> convolve_naive(const vector<double> &a,
                               const vector<double> &b) {
   int n_a = a.size();
@@ -83,7 +81,7 @@ void test_a_case(vector<double> a, vector<double> b) {
   auto arma_v2 = arma::vec(b);
   auto result_arma = arma::conv(arma_v1, arma_v2);
 
-  //timeit("convolve_naive", [&]() { return convolve_naive(a, b); });
+  // timeit("convolve_naive", [&]() { return convolve_naive(a, b); });
   timeit("ffconv::convolve1d_ref",
          [&]() { return fftconv::convolve1d_ref(a, b); });
   timeit("ffconv::convolve1d", [&]() { return fftconv::convolve1d(a, b); });
@@ -101,5 +99,5 @@ vector<double> get_vec(size_t size) {
 int main() {
   test_a_case(get_vec(1664), get_vec(65));
   test_a_case(get_vec(2816), get_vec(65));
-  //test_a_case(get_vec(2000), get_vec(2000));
+  // test_a_case(get_vec(2000), get_vec(2000));
 }
