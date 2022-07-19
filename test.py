@@ -1,5 +1,8 @@
 import numpy as np
+from scipy import signal
+
 from fftconv import convolve1d
+
 
 x = np.arange(5, dtype=np.double)
 y = np.arange(5, dtype=np.double)
@@ -16,6 +19,7 @@ from timeit import timeit
 
 N_RUNS = 5000
 
+
 def _timeit(name, callable):
     elapsed_ms = 1000 * timeit(
         callable,
@@ -27,6 +31,8 @@ def _timeit(name, callable):
 def run_bench(x, y):
     _timeit("fftconv", lambda: convolve1d(x, x.size, y, y.size))
     _timeit("np.conv", lambda: np.convolve(x, y))
+    _timeit("scipy.signal.convolve", lambda: signal.convolve(x, y))
+    _timeit("scipy.signal.fftconvolve", lambda: signal.fftconvolve(x, y))
 
 
 def run_test_case(x, y):

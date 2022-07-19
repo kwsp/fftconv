@@ -8,12 +8,16 @@ extensions = [
         include_dirs=["include", "/opt/homebrew/include"],
         libraries=["fftw3"],
         library_dirs=["/opt/homebrew/lib"],
-        extra_compile_args=["-std=c++17", "-O3"],
+        extra_compile_args=["-std=c++17", "-O3", "-Wno-sign-compare"],
         language="c++",
     ),
 ]
 
 setup(
+    install_requires=[
+        "numpy",
+        "scipy",
+    ],
     ext_modules=cythonize(
         extensions,
         compiler_directives={"language_level": "3"},
