@@ -62,27 +62,20 @@ fftconv_plans::fftconv_plans(size_t padded_length) {
 }
 
 // hash map cache to store fftw plans and buffers.
-static std::unordered_map<size_t, std::unique_ptr<fftconv_plans>> _cache;
+static thread_local std::unordered_map<size_t, std::unique_ptr<fftconv_plans>> _cache;
 // Mutex - fftw plan computation is not thread-safe by default
 // and std container read-write is not thread-safe
-std::shared_mutex _mutex;
 
 // Get fftconv_plans object.
 // The cached object will be returned if available.
 // Otherwise, a new one will be constructed.
 static fftconv_plans *_get_plans(size_t size) {
-  // _cache is thread_local so we don't need a read lock to access
-  _mutex.lock_shared();
+  // _cache is thread_local
   auto &plans = _cache[size];
-  _mutex.unlock_shared();
   if (plans)
     return plans.get();
 
-  // We need an exclusive lock to access the cache because creation of
-  // fftw_plans is not thread-safe by default
-  _mutex.lock();
   plans = std::make_unique<fftconv_plans>(size);
-  _mutex.unlock();
   return plans.get();
 }
 
