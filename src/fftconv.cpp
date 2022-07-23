@@ -37,9 +37,7 @@ struct fftconv_plans {
     fftw_destroy_plan(forward);
     fftw_destroy_plan(backward);
 
-    fftw_free(real_buf);
-    fftw_free(complex_buf_a);
-    fftw_free(complex_buf_b);
+    fftw_free(real_buf); // real_buf is the only fftw_malloc
   }
 };
 
@@ -50,9 +48,10 @@ fftconv_plans::fftconv_plans(size_t padded_length) {
   size_t complex_length = padded_length / 2 + 1;
 
   // Allocate buffers for the purposes of creating the plans...
-  real_buf = fftw_alloc_real(padded_length);
-  complex_buf_a = fftw_alloc_complex(complex_length);
-  complex_buf_b = fftw_alloc_complex(complex_length);
+  real_buf = (double *)fftw_malloc(padded_length * sizeof(double) +
+                                   2 * complex_length * sizeof(fftw_complex));
+  complex_buf_a = (fftw_complex *)(real_buf + padded_length);
+  complex_buf_b = complex_buf_a + complex_length;
 
   // Compute the plans
   forward = fftw_plan_dft_r2c_1d(padded_length, real_buf, complex_buf_a,
@@ -62,7 +61,8 @@ fftconv_plans::fftconv_plans(size_t padded_length) {
 }
 
 // hash map cache to store fftw plans and buffers.
-static thread_local std::unordered_map<size_t, std::unique_ptr<fftconv_plans>> _cache;
+static thread_local std::unordered_map<size_t, std::unique_ptr<fftconv_plans>>
+    _cache;
 // Mutex - fftw plan computation is not thread-safe by default
 // and std container read-write is not thread-safe
 
