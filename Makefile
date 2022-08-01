@@ -13,7 +13,7 @@ INC_FLAGS := $(addprefix -I,$(INC_DIRS))
 
 # The -MMD and -MP flags together generate Makefiles for us!
 # These files will have .d instead of .o as the output.
-CPPFLAGS := $(INC_FLAGS) -MMD -MP -Wall -Werror -Wno-sign-compare -O3 -I/opt/homebrew/include
+CPPFLAGS := $(INC_FLAGS) -MMD -MP -Wall -Wno-sign-compare -I/opt/homebrew/include -O3
 CXXFLAGS := -std=c++17
 
 # The final build step.
@@ -31,8 +31,12 @@ $(BUILD_DIR)/%.cpp.o: %.cpp
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
 
 .PHONY: test
-test:
+test: $(BUILD_DIR)/$(TARGET)
 	$(BUILD_DIR)/$(TARGET)
+
+.PHONY: python
+python:
+	python3 setup.py build_ext --inplace
 
 .PHONY: clean
 clean:
