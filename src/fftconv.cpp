@@ -2,9 +2,9 @@
 // 2022
 
 #include "fftconv.h"
+#include <algorithm>
 #include <array>
 #include <memory>
-#include <shared_mutex>
 #include <unordered_map>
 
 // static int nextpow2(int x) { return 1 << (int)(std::log2(x) + 1); }
@@ -45,8 +45,8 @@ static inline void elementwise_multiply(const fftw_complex *a,
                                         const fftw_complex *b,
                                         const size_t length,
                                         fftw_complex *result) {
-  // fftw_complex in C89 mode is double[2], which is binary compatible with C99's <complex.h>
-  // and C++'s complex<double> template class
+  // fftw_complex in C89 mode is double[2], which is binary compatible with
+  // C99's <complex.h> and C++'s complex<double> template class
   // http://www.fftw.org/doc/Complex-numbers.html
   const auto _a = reinterpret_cast<const std::complex<double> *>(a);
   const auto _b = reinterpret_cast<const std::complex<double> *>(b);
