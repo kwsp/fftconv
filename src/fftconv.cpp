@@ -2,13 +2,37 @@
 // 2022
 
 #include "fftconv.h"
+#include <array>
 #include <memory>
 #include <shared_mutex>
 #include <unordered_map>
 
+using std::array;
 using std::vector;
 
 static int nextpow2(int x) { return 1 << (int)(std::log2(x) + 1); }
+
+// Lookup table of {max_filter_size, optimal_fft_size}
+static const std::array<std::array<size_t, 2>, 9> _optimal_fft_size{
+    {{7, 16},
+     {12, 32},
+     {21, 64},
+     {36, 128},
+     {65, 256},
+     {120, 512},
+     {221, 1024},
+     {411, 2048},
+     {769, 4096}},
+};
+
+// Given a filter_size, return the optimal fft size for the overlap-add
+// convolution method
+static size_t get_optimal_fft_size(size_t filter_size) {
+  for (const auto &pair : _optimal_fft_size)
+    if (filter_size < pair[0])
+      return pair[1];
+  return 8192;
+}
 
 // Copy data from src to dst and padded the extra with zero
 // dst_size must be greater than src_size
@@ -185,15 +209,8 @@ void convolve1d(const double *a, const size_t a_size, const double *b,
   fftconv_plans *plan = fftconv_plans_cache(padded_length);
   plan->execute_conv(a, a_size, b, b_size);
 
-  // plan->set_real_buf(a, a_size); // Copy a to buffer
-  // plan->forward_a();             // A = fft(a)
-  // plan->set_real_buf(b, b_size); // Copy b to buffer
-  // plan->forward_b();             // B = fft(b)
-  // plan->complex_multiply_to_a(); // Complex elementwise multiple, A = A * B
-  // plan->backward();              // a = ifft(A)
-
   // copy normalized to result
-  auto real_buf = plan->get_real_buf();
+  const auto real_buf = plan->get_real_buf();
   for (int i = 0; i < padded_length; i++) {
     result[i] = real_buf[i];
   }
@@ -278,35 +295,32 @@ std::vector<double> convolve1d_ref(const vector<double> &a,
 // 2. convolve with kernel b. The size of the convolution should be
 //    (B + y_size - 1)
 // 3. add blocks together
-void fftfilt(const double *x, const size_t x_size, const double *b,
-             const size_t b_size, double *y, const size_t y_size) {
+void fftfilt(const double *x, const size_t x_size, const double *h,
+             const size_t h_size, double *y, const size_t y_size) {
   // Use overlap and add to convolve x and b
-  const size_t B = nextpow2(b_size); // block size
-  const size_t n_blocks = std::ceil((double)x_size / B);
+  // const size_t N = 8 * nextpow2(h_size); // size for each fft
+  const size_t N = get_optimal_fft_size(h_size); // size for each fft
+  const size_t step_size = N - (h_size - 1);
 
   // forward fft of b
-  size_t each_conv_size = B + b_size - 1;
-  auto plan = fftconv_plans_cache(each_conv_size);
-  plan->set_real_buf(b, b_size);
+  auto plan = fftconv_plans_cache(N);
+  plan->set_real_buf(h, h_size);
   plan->forward_b();
 
   // create forward/backward ffts for x
-  // const size_t _y_size = b_size + x_size - 1; // y should be at least this
-  // big
   auto real_buf = plan->get_real_buf();
-  for (int n = 0; n < n_blocks; ++n) {
-    const size_t lo = n * B;
-    const size_t hi = std::min(lo + B, x_size); // bound check hi
-    plan->set_real_buf(x + lo, hi - lo);
+  for (size_t pos = 0; pos < x_size; pos += step_size) {
+    size_t len = std::min(x_size - pos, step_size); // bound check
+    plan->set_real_buf(x + pos, len);
     plan->forward_a();
     plan->complex_multiply_to_a();
     plan->backward();
-    // plan->normalize();
+    // plan->normalize(); // either normalize here or later in the copy loop
 
     // normalize output and add to result
-    const int upper = std::min(lo + each_conv_size, y_size);
-    for (int i = 0; i < upper - lo; ++i)
-      y[lo + i] += real_buf[i] / each_conv_size;
+    len = std::min(y_size - pos, N);
+    for (size_t i = 0; i < len; ++i)
+      y[pos + i] += real_buf[i] / N;
   }
 }
 
