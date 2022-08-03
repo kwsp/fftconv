@@ -88,8 +88,8 @@ void make_same_length(vector<double> &vec, size_t len) {
 
 template <class T> void print_vec(T *arr, size_t sz) {
   for (int i = 0; i < sz; ++i)
-    std::cout << std::setw(4) << arr[i] << ", ";
-  std::cout << "\n";
+    cout << std::setw(4) << arr[i] << ", ";
+  cout << "\n";
 }
 
 template <class T> void print_vec(std::vector<T> vec) {
@@ -107,20 +107,20 @@ void test_a_case(vector<double> a, vector<double> b) {
   auto result_naive = convolve_naive(a, b);
 
   //auto result_fft_ref = fftconv::convolve1d_ref(a, b);
-  //std::cout << "naive vs fft_ref ";
+  //cout << "naive vs fft_ref ";
   //if (!cmp_vec(result_naive, result_fft_ref)) {
-    //std::cout << "naive   : ";
+    //cout << "naive   : ";
     //print_vec(result_naive);
-    //std::cout << "fft_ref : ";
+    //cout << "fft_ref : ";
     //print_vec(result_fft_ref);
   //}
 
   auto result_fft = fftconv::convolve1d(a, b);
-  std::cout << "naive vs fft ";
+  cout << "naive vs fft ";
   if (!cmp_vec(result_naive, result_fft)) {
-    std::cout << "naive     : ";
+    cout << "naive     : ";
     print_vec(result_naive);
-    std::cout << "convolve1d: ";
+    cout << "convolve1d: ";
     print_vec(result_fft);
   }
 
@@ -129,11 +129,11 @@ void test_a_case(vector<double> a, vector<double> b) {
   auto result_arma = arma::conv(arma_a, arma_b);
 
   auto result_fftfilt = fftconv::fftfilt(a, b);
-  std::cout << "naive vs fftfilt ";
+  cout << "naive vs fftfilt ";
   if (!cmp_vec(result_naive, result_fftfilt)) {
-    std::cout << "naive  : ";
+    cout << "naive  : ";
     print_vec(result_naive);
-    std::cout << "fftfilt: ";
+    cout << "fftfilt: ";
     print_vec(result_fftfilt);
   }
 
@@ -156,7 +156,7 @@ vector<double> get_vec(size_t size) {
 
 int main() {
   // test_a_case(get_vec(22), get_vec(10));
-  // test_a_case({0, 1, 2, 3, 4, 5, 6, 7}, {0, 1, 2, 3});
+   //test_a_case({0, 1, 2, 3, 4, 5, 6, 7}, {0, 1, 2, 3});
   test_a_case(get_vec(8), get_vec(4));
   test_a_case(get_vec(1664), get_vec(65));
   test_a_case(get_vec(2816), get_vec(65));
