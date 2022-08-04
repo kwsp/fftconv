@@ -1,5 +1,6 @@
 // Author: Tiger Nie
 // 2022
+// https://github.com/kwsp/fftconv
 
 #include "fftconv.h"
 #include <algorithm>
@@ -247,17 +248,14 @@ void fftconv_ref(const double *a, const size_t a_sz, const double *b,
   fftw_destroy_plan(plan_backward);
 }
 
-// Overlap-Add convolution of x and h with block length B
+// Overlap-Add convolution of x and h
 //
 // x is a long signal
 // h is a kernel, x_size >> h_size
 // y is the results buffer. y_size >= x_size + b_size - 1
 //
-// B is the block size
-//
-// 1. Split x into blocks of size B.
-// 2. convolve with kernel b. The size of the convolution should be
-//    (B + y_size - 1)
+// 1. Split x into blocks of step_size.
+// 2. convolve with kernel b using fft of length N.
 // 3. add blocks together
 void fftconv_oa(const double *x, const size_t x_sz, const double *h,
                 const size_t h_sz, double *y, const size_t y_sz) {
@@ -266,13 +264,13 @@ void fftconv_oa(const double *x, const size_t x_sz, const double *h,
   const size_t N = get_optimal_fft_size(h_sz); // more optimal size for each fft
   const size_t step_size = N - (h_sz - 1);
 
-  // forward fft of b
+  // forward fft of h
   auto plan = fftconv_plans_cache(N);
   plan->set_real_buf(h, h_sz);
   plan->forward_b();
 
   // create forward/backward ffts for x
-  auto real_buf = plan->get_real_buf();
+  const auto real_buf = plan->get_real_buf();
   for (size_t pos = 0; pos < x_sz; pos += step_size) {
     size_t len = std::min(x_sz - pos, step_size); // bound check
     plan->set_real_buf(x + pos, len);

@@ -34,6 +34,7 @@ def run_bench(x, y):
     _timeit("np.convolve", lambda: np.convolve(x, y))
     _timeit("scipy.signal.convolve", lambda: signal.convolve(x, y))
     _timeit("scipy.signal.fftconvolve", lambda: signal.fftconvolve(x, y))
+    _timeit("scipy.signal.oaconvolve", lambda: signal.oaconvolve(x, y))
 
 
 def run_test_case(x, y):

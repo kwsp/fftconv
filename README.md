@@ -2,8 +2,14 @@
 
 Extremely fast 1D discrete convolutions of real vectors in a header-only library. `fftconv` uses [FFTW 3](http://www.fftw.org/) under the hood.
 
-It's well know that convolution in the time domain is equivalent to multiplication in the frequency domain. With the Fast Fourier Transform, we can reduce the time complexity of a discrete convolution from `O(n^2)` to `O(n log(n))`, where `n` is the larger of the two array sizes.
+It's well know that convolution in the time domain is equivalent to multiplication in the frequency domain (circular convolution). With the Fast Fourier Transform, we can reduce the time complexity of a discrete convolution from `O(n^2)` to `O(n log(n))`, where `n` is the larger of the two array sizes. The **[overlap-add method](https://en.wikipedia.org/wiki/Overlap%E2%80%93add_method)** is a fast convolution method commonly use in FIR filtering, where the discrete signal is often much longer than the FIR filter kernel.
 
+* `fftconv::fftconv` implements FFT convolution with memory optimizations.
+* `fftconv:fftconv_oa` implements FFT convolution using the overlap-add method, much faster for FIR filtering.
+
+In C++, All routines provide a C-array interface, a `std::vector` interface, and an `arma::vec` interface (if `<armadillo>` is included before `"fftconv.h"`).
+
+Python bindings are provided through Cython.
 
 ## Build
 

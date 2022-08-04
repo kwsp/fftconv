@@ -39,7 +39,8 @@ vector<double> convolve_naive(const vector<double> &a,
 }
 
 // Run the `callable` `n_runs` times and print the time.
-void _timeit(std::string_view name, std::function<void()> callable, int n_runs = N_RUNS) {
+void _timeit(std::string_view name, std::function<void()> callable,
+             int n_runs = N_RUNS) {
   using namespace std::chrono;
   cout << "    (" << n_runs << " runs) " << name;
   auto start = high_resolution_clock::now();
@@ -50,8 +51,9 @@ void _timeit(std::string_view name, std::function<void()> callable, int n_runs =
   cout << " took " << elapsed.count() << "ms\n";
 }
 
-#define TIMEIT(FUNC, V1, V2) \
-_timeit(#FUNC, [&]() { return FUNC(V1, V2); }, N_RUNS);
+#define TIMEIT(FUNC, V1, V2)                                                   \
+  _timeit(                                                                     \
+      #FUNC, [&]() { return FUNC(V1, V2); }, N_RUNS);
 
 // Compare two vectors
 template <class T>
@@ -105,7 +107,7 @@ void print_vec(arma::vec vec) { print_vec(vec.memptr(), vec.size()); }
 void _test(const vector<double> &a, const vector<double> &b) {
   // Ground true
   auto gt = convolve_naive(a, b);
-  auto cmp = [&](std::string_view name, vector<double> &res) {
+  auto cmp = [&](std::string_view name, vector<double> res) {
     cout << "gt vs " << name << " ";
     if (!cmp_vec(gt, res)) {
       cout << "ground truth: ";
@@ -115,26 +117,27 @@ void _test(const vector<double> &a, const vector<double> &b) {
     }
   };
 
-  auto res_fftconv = fftconv::fftconv(a, b);
-  cmp("fftconv", res_fftconv);
-  auto res_oa = fftconv::fftconv_oa(a, b);
-  cmp("fftconv_oa", res_oa);
+  cmp("fftconv", fftconv::fftconv(a, b));
+  cmp("fftconv_oa", fftconv::fftconv_oa(a, b));
 }
 
-// Run a test case
-void test_a_case(vector<double> a, vector<double> b) {
-  using namespace std::chrono;
-  printf("=== test case (%lu, %lu) ===\n", a.size(), b.size());
-  _test(a, b);
-
+void _bench(const vector<double> &a, const vector<double> &b) {
   auto arma_a = arma::vec(a);
   auto arma_b = arma::vec(b);
   // auto result_arma = arma::conv(arma_a, arma_b);
 
-  //TIMEIT(fftconv::fftconv_ref, a, b);
+  // TIMEIT(convolve_naive, a, b);
+  //  TIMEIT(fftconv::fftconv_ref, a, b);
   TIMEIT(fftconv::fftconv, a, b);
   TIMEIT(fftconv::fftconv_oa, a, b);
   TIMEIT(arma_conv, arma_a, arma_b);
+}
+
+// Run a test case
+void test_a_case(vector<double> a, vector<double> b) {
+  printf("=== test case (%lu, %lu) ===\n", a.size(), b.size());
+  _test(a, b);
+  _bench(a, b);
 }
 
 vector<double> get_vec(size_t size) {
