@@ -7,6 +7,7 @@
 
 #include <cassert>
 #include <memory>
+#include <mutex>
 #include <unordered_map>
 #include <vector>
 
@@ -33,6 +34,11 @@
 #endif
 
 namespace fftconv {
+
+// Since FFTW planners are not thread-safe, you can pass a pointer to a
+// std::mutex to fftconv and all calls to the planner with be guarded by the
+// mutex.
+void use_fftw_mutex(std::mutex *fftw_mutex);
 
 // 1D convolution using the FFT
 // Optimizations:

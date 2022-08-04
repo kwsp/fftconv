@@ -7,6 +7,8 @@
 #include <array>
 #include <complex>
 
+std::mutex *_fftw_mutex = nullptr;
+
 // static int nextpow2(int x) { return 1 << (int)(std::log2(x) + 1); }
 
 // Lookup table of {max_filter_size, optimal_fft_size}
@@ -111,11 +113,16 @@ public:
       : real_sz(padded_length), complex_sz(padded_length / 2 + 1),
         real_buf(fftw_alloc_real(real_sz)),
         complex_buf_a(fftw_alloc_complex(complex_sz)),
-        complex_buf_b(fftw_alloc_complex(complex_sz)),
-        plan_f(fftw_plan_dft_r2c_1d(padded_length, real_buf, complex_buf_a,
-                                    FFTW_ESTIMATE)),
-        plan_b(fftw_plan_dft_c2r_1d(padded_length, complex_buf_a, real_buf,
-                                    FFTW_ESTIMATE)) {}
+        complex_buf_b(fftw_alloc_complex(complex_sz)) {
+    if (_fftw_mutex)
+      _fftw_mutex->lock();
+    plan_f = fftw_plan_dft_r2c_1d(padded_length, real_buf, complex_buf_a,
+                                  FFTW_ESTIMATE);
+    plan_b = fftw_plan_dft_c2r_1d(padded_length, complex_buf_a, real_buf,
+                                  FFTW_ESTIMATE);
+    if (_fftw_mutex)
+      _fftw_mutex->unlock();
+  }
 
   fftconv_plans() = delete;                               // default constructor
   fftconv_plans(fftconv_plans &&) = delete;               // move constructor
@@ -166,10 +173,12 @@ public:
   }
 };
 
+// static thread_local Cache<size_t, fft_plan> fft_plan_cache;
+static thread_local fftconv::Cache<size_t, fftconv_plans> fftconv_plans_cache;
+
 namespace fftconv {
 
-// static thread_local Cache<size_t, fft_plan> fft_plan_cache;
-static thread_local Cache<size_t, fftconv_plans> fftconv_plans_cache;
+void use_fftw_mutex(std::mutex *fftw_mutex) { _fftw_mutex = fftw_mutex; }
 
 void fftconv(const double *a, const size_t a_sz, const double *b,
              const size_t b_sz, double *result, const size_t res_sz) {
