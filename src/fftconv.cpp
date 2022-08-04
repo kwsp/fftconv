@@ -5,6 +5,7 @@
 #include "fftconv.h"
 #include <algorithm>
 #include <array>
+#include <complex>
 
 // static int nextpow2(int x) { return 1 << (int)(std::log2(x) + 1); }
 
@@ -51,9 +52,8 @@ static inline void elementwise_multiply(const fftw_complex *a,
   const auto _b = reinterpret_cast<const std::complex<double> *>(b);
   auto _res = reinterpret_cast<std::complex<double> *>(result);
 
-  for (size_t i = 0; i < length; ++i) {
+  for (size_t i = 0; i < length; ++i)
     _res[i] = _a[i] * _b[i];
-  }
 }
 
 // enum class fft_direction { Forward = 0b01, Backward = 0b10 };
@@ -90,7 +90,7 @@ static inline void elementwise_multiply(const fftw_complex *a,
 // fftconv_plans manages the memory of the forward and backward fft plans
 // and the fftw buffers
 class fftconv_plans {
-public:
+private:
   // FFTW buffer sizes
   const size_t real_sz;
   const size_t complex_sz;
@@ -106,12 +106,20 @@ public:
 
 public:
   // Constructors
-  fftconv_plans(size_t padded_length);
-  fftconv_plans() = delete; // default constructor
+  // Compute the fftw plans and allocate buffers
+  fftconv_plans(size_t padded_length)
+      : real_sz(padded_length), complex_sz(padded_length / 2 + 1),
+        real_buf(fftw_alloc_real(real_sz)),
+        complex_buf_a(fftw_alloc_complex(complex_sz)),
+        complex_buf_b(fftw_alloc_complex(complex_sz)),
+        plan_f(fftw_plan_dft_r2c_1d(padded_length, real_buf, complex_buf_a,
+                                    FFTW_ESTIMATE)),
+        plan_b(fftw_plan_dft_c2r_1d(padded_length, complex_buf_a, real_buf,
+                                    FFTW_ESTIMATE)) {}
 
-  fftconv_plans(fftconv_plans &&) = delete;      // move constructor
-  fftconv_plans(const fftconv_plans &) = delete; // copy constructor
-
+  fftconv_plans() = delete;                               // default constructor
+  fftconv_plans(fftconv_plans &&) = delete;               // move constructor
+  fftconv_plans(const fftconv_plans &) = delete;          // copy constructor
   fftconv_plans &operator=(const fftconv_plans) = delete; // copy assignment
   fftconv_plans &operator=(fftconv_plans &&) = delete;    // move assignment
 
@@ -144,6 +152,7 @@ public:
                          complex_buf_a);
   }
 
+  // Convolve real arrays a and b
   // Results saved in real_buf
   void execute_conv(const double *a, const size_t a_size, const double *b,
                     const size_t b_size) {
@@ -156,17 +165,6 @@ public:
     normalize();             // divide each result elem by real_sz
   }
 };
-
-// Compute the fftw plans and allocate buffers
-fftconv_plans::fftconv_plans(size_t padded_length)
-    : real_sz(padded_length), complex_sz(padded_length / 2 + 1),
-      real_buf(fftw_alloc_real(real_sz)),
-      complex_buf_a(fftw_alloc_complex(complex_sz)),
-      complex_buf_b(fftw_alloc_complex(complex_sz)),
-      plan_f(fftw_plan_dft_r2c_1d(padded_length, real_buf, complex_buf_a,
-                                  FFTW_ESTIMATE)),
-      plan_b(fftw_plan_dft_c2r_1d(padded_length, complex_buf_a, real_buf,
-                                  FFTW_ESTIMATE)) {}
 
 namespace fftconv {
 
@@ -184,11 +182,11 @@ void fftconv(const double *a, const size_t a_sz, const double *b,
 
   // copy normalized to result
   const auto real_buf = plan->get_real_buf();
-  for (int i = 0; i < padded_length; i++) {
+  for (int i = 0; i < padded_length; i++)
     result[i] = real_buf[i];
-  }
 }
 
+// reference implementation of fftconv with no optimizations
 void fftconv_ref(const double *a, const size_t a_sz, const double *b,
                  const size_t b_sz, double *result, const size_t result_sz) {
   // length of the real arrays, including the final convolution output
@@ -234,9 +232,8 @@ void fftconv_ref(const double *a, const size_t a_sz, const double *b,
   fftw_execute_dft_c2r(plan_backward, input_buffer, output_buffer);
 
   // Normalize output
-  for (int i = 0; i < padded_length; i++) {
+  for (int i = 0; i < padded_length; i++)
     result[i] = output_buffer[i] / padded_length;
-  }
 
   fftw_free(a_buf);
   fftw_free(b_buf);
