@@ -4,6 +4,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <functional>
+#include <iomanip>
 #include <iostream>
 #include <string>
 #include <string_view>
@@ -60,7 +61,7 @@ template <class T>
 bool cmp_vec(T *a, const size_t l_a, T *b, const size_t l_b) {
   assert(l_a == l_b);
   for (auto i = 0; i < l_a; ++i)
-    if (abs(a[i] - b[i]) > err) {
+    if (std::abs(a[i] - b[i]) > err) {
       printf("Vectors are different: v1[%d]=%f, v2[%d]=%f\n", i, a[i], i, b[i]);
       return false;
     }
