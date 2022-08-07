@@ -8,7 +8,7 @@ extensions = [
         include_dirs=["./src", "/opt/homebrew/include"],
         libraries=["fftw3"],
         library_dirs=["/opt/homebrew/lib"],
-        extra_compile_args=["-std=c++17", "-O3", "-Wno-sign-compare"],
+        extra_compile_args=["-std=c++17", "-Ofast", "-Wno-sign-compare"],
         language="c++",
     ),
 ]
