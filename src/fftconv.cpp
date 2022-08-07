@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <array>
 #include <complex>
+#include <cstring>
 
 std::mutex *_fftw_mutex = nullptr;
 
@@ -38,25 +39,6 @@ static size_t get_optimal_fft_size(const size_t filter_size) {
 template <class T>
 static inline void _copy_to_padded_buffer(const T *src, const size_t src_size,
                                           T *dst, const size_t dst_size) {
-  assert(src_size <= dst_size);
-  std::copy(src, src + src_size, dst);
-  std::fill(dst + src_size, dst + dst_size, 0);
-}
-// Copy real to complex buffer
-static inline void _copy_to_padded_buffer(const double *src,
-                                          const size_t src_size,
-                                          fftw_complex *dst,
-                                          const size_t dst_size) {
-  assert(src_size <= dst_size);
-  for (size_t i = 0; i < src_size; i++)
-    dst[i][0] = src[i];
-  std::fill(dst + src_size, dst + dst_size, 0);
-}
-// Copy std::complex to fftw_complex (they are binary compatible)
-static inline void _copy_to_padded_buffer(const std::complex<double> *src,
-                                          const size_t src_size,
-                                          fftw_complex *dst,
-                                          const size_t dst_size) {
   assert(src_size <= dst_size);
   std::copy(src, src + src_size, dst);
   std::fill(dst + src_size, dst + dst_size, 0);
@@ -185,94 +167,6 @@ public:
     set_real_buf(a, a_size); // Copy a to buffer
     forward_a();             // A = fft(a)
     set_real_buf(b, b_size); // Copy b to buffer
-    forward_b();             // B = fft(b)
-    complex_multiply_to_a(); // Complex elementwise multiple, A = A * B
-    backward();              // a = ifft(A)
-    normalize();             // divide each result elem by real_sz
-  }
-};
-
-// fftconv_plans manages the memory of the forward and backward fft plans
-// and the fftw buffers
-class fftconv_plans_complex {
-private:
-  // FFTW buffer sizes
-  const size_t sz;
-
-  // FFTW buffers corresponding to the above plans
-  fftw_complex *complex_buf_a;
-  fftw_complex *complex_buf_b;
-
-  // FFTW plans
-  fftw_plan plan_f; // forward
-  fftw_plan plan_b; // backward
-
-public:
-  // Constructors
-  // Compute the fftw plans and allocate buffers
-  fftconv_plans_complex(size_t p_sz)
-      : sz(p_sz), complex_buf_a(fftw_alloc_complex(sz)),
-        complex_buf_b(fftw_alloc_complex(sz)) {
-    if (_fftw_mutex)
-      _fftw_mutex->lock();
-    plan_f = fftw_plan_dft_1d(sz, complex_buf_a, complex_buf_a, FFTW_FORWARD,
-                              FFTW_ESTIMATE);
-    plan_b = fftw_plan_dft_1d(sz, complex_buf_a, complex_buf_a, FFTW_BACKWARD,
-                              FFTW_ESTIMATE);
-    if (_fftw_mutex)
-      _fftw_mutex->unlock();
-  }
-
-  fftconv_plans_complex() = delete;
-  fftconv_plans_complex(fftconv_plans &&) = delete;
-  fftconv_plans_complex(const fftconv_plans &) = delete;
-  fftconv_plans_complex &operator=(const fftconv_plans) = delete;
-  fftconv_plans_complex &operator=(fftconv_plans &&) = delete;
-
-  // Destructor
-  ~fftconv_plans_complex() {
-    fftw_free(complex_buf_a);
-    fftw_free(complex_buf_b);
-    fftw_destroy_plan(plan_f);
-    fftw_destroy_plan(plan_b);
-  }
-
-  void set_input_a(const double *inp, size_t sz) {
-    _copy_to_padded_buffer(inp, sz, this->complex_buf_a, this->sz);
-  }
-  void set_input_a(const std::complex<double> *inp, size_t sz) {
-    _copy_to_padded_buffer(inp, sz, this->complex_buf_a, this->sz);
-  }
-  void set_input_b(const double *inp, size_t sz) {
-    _copy_to_padded_buffer(inp, sz, this->complex_buf_b, this->sz);
-  }
-  void set_input_b(const std::complex<double> *inp, size_t sz) {
-    _copy_to_padded_buffer(inp, sz, this->complex_buf_b, this->sz);
-  }
-  constexpr fftw_complex *get_buf_a() const { return this->complex_buf_a; }
-  constexpr size_t get_sz() const { return this->sz; }
-
-  void forward_a() { fftw_execute_dft(plan_f, complex_buf_a, complex_buf_a); }
-  void forward_b() { fftw_execute_dft(plan_f, complex_buf_b, complex_buf_b); }
-  void backward() { fftw_execute_dft(plan_b, complex_buf_a, complex_buf_a); }
-  // Complex element-wise multiply a and b, save results to a
-  void complex_multiply_to_a() {
-    elementwise_multiply(complex_buf_a, complex_buf_b, sz, complex_buf_a);
-  }
-  void normalize() {
-    for (size_t i = 0; i < sz; ++i) {
-      complex_buf_a[i][0] /= sz;
-      complex_buf_a[i][1] /= sz;
-    }
-  }
-
-  // Convolve real arrays a and b
-  // Results saved in real_buf
-  void execute_conv(const double *a, const size_t a_size, const double *b,
-                    const size_t b_size) {
-    set_input_a(a, a_size);  // Copy a to buffer
-    forward_a();             // A = fft(a)
-    set_input_b(b, b_size);  // Copy b to buffer
     forward_b();             // B = fft(b)
     complex_multiply_to_a(); // Complex elementwise multiple, A = A * B
     backward();              // a = ifft(A)
