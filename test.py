@@ -1,6 +1,7 @@
 from timeit import timeit
 import numpy as np
 from scipy import signal
+from numba import jit
 
 import fftconv
 
@@ -27,11 +28,17 @@ def _timeit(name, callable):
     )
     print(f"    ({N_RUNS} runs) {name} took {round(elapsed_ms)}ms")
 
+@jit
+def numba_convolve(x, y):
+    return np.convolve(x, y)
 
 def run_bench(x, y):
     _timeit("fftconv", lambda: fftconv.fftconv(x, y))
     _timeit("fftconv_oa", lambda: fftconv.fftconv_oa(x, y))
     _timeit("np.convolve", lambda: np.convolve(x, y))
+
+    numba_convolve(x, y)
+    _timeit("jit(np.convolve)", lambda: numba_convolve(x, y))
     _timeit("scipy.signal.convolve", lambda: signal.convolve(x, y))
     _timeit("scipy.signal.fftconvolve", lambda: signal.fftconvolve(x, y))
     _timeit("scipy.signal.oaconvolve", lambda: signal.oaconvolve(x, y))
