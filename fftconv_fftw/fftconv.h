@@ -45,21 +45,29 @@ void use_fftw_mutex(std::mutex *fftw_mutex);
 //    * Cache fftw_plan
 //    * Reuse buffers (no malloc on second call to the same convolution size)
 // https://en.wikipedia.org/w/index.php?title=Convolution#Fast_convolution_algorithms
-void fftconv(const double *a, const size_t a_sz, const double *b,
-             const size_t b_sz, double *y, const size_t y_sz);
+void convolve_fftw(const double *a, const size_t a_sz, const double *b,
+             const size_t b_sz, double *result, const size_t res_sz);
 
 // Reference implementation of fft convolution with minimal optimizations
-void fftconv_ref(const double *a, const size_t a_sz, const double *b,
-                 const size_t b_sz, double *y, const size_t y_sz);
+void convolve_fftw_ref(const double *a, const size_t a_sz, const double *b,
+                 const size_t b_sz, double *result, const size_t result_sz);
 
-// 1D FFTconv with overlap-add method
-void fftconv_oa(const double *x, const size_t x_sz, const double *h,
+// 1D Overlap-Add convolution of x and h
+//
+// x is a long signal
+// h is a kernel, x_size >> h_size
+// y is the results buffer. y_size >= x_size + b_size - 1
+//
+// 1. Split x into blocks of step_size.
+// 2. convolve with kernel b using fft of length N.
+// 3. add blocks together
+void oaconvolve_fftw(const double *x, const size_t x_sz, const double *h,
                 const size_t h_sz, double *y, const size_t y_sz);
 
 // std::vector interface to the fftconv routines
-VECTOR_WRAPPER(fftconv)
-VECTOR_WRAPPER(fftconv_ref)
-VECTOR_WRAPPER(fftconv_oa)
+VECTOR_WRAPPER(convolve_fftw)
+VECTOR_WRAPPER(convolve_fftw_ref)
+VECTOR_WRAPPER(oaconvolve_fftw)
 
 // arma::vec interface
 #ifdef ARMA_WRAPPER

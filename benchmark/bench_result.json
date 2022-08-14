@@ -1,0 +1,66 @@
+{
+  "context": {
+    "date": "2022-08-13T23:51:48-05:00",
+    "host_name": "florence",
+    "executable": "./build/fftconv_bench",
+    "num_cpus": 16,
+    "mhz_per_cpu": 3792,
+    "cpu_scaling_enabled": false,
+    "caches": [
+      {
+        "type": "Data",
+        "level": 1,
+        "size": 32768,
+        "num_sharing": 2
+      },
+      {
+        "type": "Instruction",
+        "level": 1,
+        "size": 32768,
+        "num_sharing": 2
+      },
+      {
+        "type": "Unified",
+        "level": 2,
+        "size": 262144,
+        "num_sharing": 2
+      },
+      {
+        "type": "Unified",
+        "level": 3,
+        "size": 16777216,
+        "num_sharing": 16
+      }
+    ],
+    "load_avg": [0,0.02,0.04],
+    "library_build_type": "release"
+  },
+  "benchmarks": [
+    {
+      "name": "BM_fftw_oaconvolve/1000/15",
+      "family_index": 0,
+      "per_family_instance_index": 0,
+      "run_name": "BM_fftw_oaconvolve/1000/15",
+      "run_type": "iteration",
+      "repetitions": 1,
+      "repetition_index": 0,
+      "threads": 1,
+      "iterations": 35317,
+      "real_time": 1.8337967550932051e+04,
+      "cpu_time": 1.8337908089588582e+04,
+      "time_unit": "ns"
+    },
+    {
+      "name": "BM_fftw_oaconvolve/1664/15",
+      "family_index": 0,
+      "per_family_instance_index": 1,
+      "run_name": "BM_fftw_oaconvolve/1664/15",
+      "run_type": "iteration",
+      "repetitions": 1,
+      "repetition_index": 0,
+      "threads": 1,
+      "iterations": 22837,
+      "real_time": 3.0242641326975143e+04,
+      "cpu_time": 3.0242523098480535e+04,
+      "time_unit": "ns"
+    }
