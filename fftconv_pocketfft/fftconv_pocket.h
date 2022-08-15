@@ -62,6 +62,15 @@ private:
     CONV_FUNC(x.data(), x.size(), b.data(), b.size(), y.data(), y.size());     \
     return y;                                                                  \
   }
+#define VECTOR_WRAPPER_FFTCONV_POCKETFFT_HDR(CONV_FUNC)                        \
+  inline std::vector<double> CONV_FUNC(const std::vector<double> &x,           \
+                                       const std::vector<double> &b,           \
+                                       const size_t nthreads = 1) {            \
+    std::vector<double> y(b.size() + x.size() - 1);                            \
+    CONV_FUNC(x.data(), x.size(), b.data(), b.size(), y.data(), y.size(),      \
+              nthreads);                                                       \
+    return y;                                                                  \
+  }
 
 // Copy data from src to dst and padded the extra with zero
 // dst_size must be greater than src_size
@@ -164,9 +173,9 @@ struct pocketfft_plan {
 
 static thread_local Cache<size_t, pocketfft_plan> pocketfft_plan_cache;
 
-inline void convolve_pocketfft(const double *a, const size_t a_sz, const double *b,
-                           const size_t b_sz, double *res,
-                           const size_t res_sz) {
+inline void convolve_pocketfft(const double *a, const size_t a_sz,
+                               const double *b, const size_t b_sz, double *res,
+                               const size_t res_sz) {
   // length of the real arrays, including the final convolution output
   const size_t size_r = a_sz + b_sz - 1;
 
@@ -201,8 +210,8 @@ inline void convolve_pocketfft(const double *a, const size_t a_sz, const double 
 }
 
 inline void oaconvolve_pocketfft(const double *a, const size_t a_sz,
-                              const double *b, const size_t b_sz, double *res,
-                              const size_t res_sz) {
+                                 const double *b, const size_t b_sz,
+                                 double *res, const size_t res_sz) {
   const size_t size_r = get_optimal_fft_size(b_sz);
   const size_t step_size = size_r - (b_sz - 1);
 
@@ -228,11 +237,10 @@ inline void oaconvolve_pocketfft(const double *a, const size_t a_sz,
   }
 }
 
-constexpr int POCKETFFT_N_THREADS = 8;
-
 inline void convolve_pocketfft_hdr(const double *a, const size_t a_sz,
-                               const double *b, const size_t b_sz, double *res,
-                               const size_t res_sz) {
+                                   const double *b, const size_t b_sz,
+                                   double *res, const size_t res_sz,
+                                   size_t nthreads = 1) {
   using namespace pocketfft;
   using std::complex;
   const size_t axis = 0;
@@ -253,13 +261,13 @@ inline void convolve_pocketfft_hdr(const double *a, const size_t a_sz,
 
   _copy_to_padded_buffer(a, a_sz, r_buf, size_r);
   pocketfft::r2c(shape_r, stride_r, stride_c, axis, FORWARD, r_buf, A_buf, 1.,
-                 POCKETFFT_N_THREADS);
+                 nthreads);
   // std::cout << "A_buf: ";
   // print(A_buf, size_c);
 
   _copy_to_padded_buffer(b, b_sz, r_buf, size_r);
   pocketfft::r2c(shape_r, stride_r, stride_c, axis, FORWARD, r_buf, B_buf, 1.,
-                 POCKETFFT_N_THREADS);
+                 nthreads);
   // std::cout << "B_buf: ";
   // print(B_buf, size_c);
 
@@ -268,7 +276,7 @@ inline void convolve_pocketfft_hdr(const double *a, const size_t a_sz,
   // print(A_buf, size_c);
 
   pocketfft::c2r(shape_r, stride_c, stride_r, axis, BACKWARD, A_buf, r_buf,
-                 1. / size_r, POCKETFFT_N_THREADS);
+                 1. / size_r, nthreads);
   // std::cout << "r    : ";
   // print(r_buf, size_r);
 
@@ -278,8 +286,9 @@ inline void convolve_pocketfft_hdr(const double *a, const size_t a_sz,
 }
 
 inline void oaconvolve_pocketfft_hdr(const double *a, const size_t a_sz,
-                                  const double *b, const size_t b_sz,
-                                  double *res, const size_t res_sz) {
+                                     const double *b, const size_t b_sz,
+                                     double *res, const size_t res_sz,
+                                     size_t nthreads = 1) {
   using namespace pocketfft;
   using std::complex;
 
@@ -301,7 +310,7 @@ inline void oaconvolve_pocketfft_hdr(const double *a, const size_t a_sz,
 
   _copy_to_padded_buffer(b, b_sz, r_buf, size_r);
   pocketfft::r2c(shape_r, stride_r, stride_c, axis, FORWARD, r_buf, B_buf, 1.,
-                 POCKETFFT_N_THREADS);
+                 nthreads);
   // std::cout << "B_buf: ";
   // print(B_buf, size_c);
 
@@ -309,10 +318,10 @@ inline void oaconvolve_pocketfft_hdr(const double *a, const size_t a_sz,
     size_t len = std::min(a_sz - pos, step_size);
     _copy_to_padded_buffer(a + pos, len, r_buf, size_r);
     pocketfft::r2c(shape_r, stride_r, stride_c, axis, FORWARD, r_buf, A_buf, 1.,
-                   POCKETFFT_N_THREADS);
+                   nthreads);
     elementwise_multiply(A_buf, B_buf, size_c, A_buf);
     pocketfft::c2r(shape_r, stride_c, stride_r, axis, BACKWARD, A_buf, r_buf,
-                   1., POCKETFFT_N_THREADS); // normalize later
+                   1., nthreads); // normalize later
 
     len = std::min(res_sz - pos, size_r);
     for (size_t i = 0; i < len; ++i)
@@ -322,9 +331,10 @@ inline void oaconvolve_pocketfft_hdr(const double *a, const size_t a_sz,
 
 VECTOR_WRAPPER(convolve_pocketfft)
 VECTOR_WRAPPER(oaconvolve_pocketfft)
-VECTOR_WRAPPER(convolve_pocketfft_hdr)
-VECTOR_WRAPPER(oaconvolve_pocketfft_hdr)
+VECTOR_WRAPPER_FFTCONV_POCKETFFT_HDR(convolve_pocketfft_hdr)
+VECTOR_WRAPPER_FFTCONV_POCKETFFT_HDR(oaconvolve_pocketfft_hdr)
 
 } // namespace fftconv
 
 #undef VECTOR_WRAPPER
+#undef VECTOR_WRAPPER_FFTCONV_POCKETFFT_HDR

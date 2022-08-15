@@ -1,4 +1,5 @@
 #include <benchmark/benchmark.h>
+#include <cstdlib>
 #include <functional>
 #include <vector>
 
@@ -45,14 +46,6 @@ void convolve_armadillo(vector<double> &a, vector<double> &b) {
 }
 
 //------------------ Benchmarks
-template <class F> void BM_ConvVec(benchmark::State &state) {
-  auto a = get_vec(state.range(0));
-  auto b = get_vec(state.range(1));
-  for (auto _ : state) {
-    F(a, b);
-  }
-}
-
 #define MAKE_BM_FUNC(NAME, FUNC)                                               \
   void NAME(benchmark::State &state) {                                         \
     auto a = get_vec(state.range(0));                                          \

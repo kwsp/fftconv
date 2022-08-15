@@ -13,8 +13,10 @@ class Benchmark:
     func_name: str
     param1: int
     param2: int
+    param3: int
     cpu_time_ns: int
     cpu_time_ms: int
+    real_time_ms: int
     iterations: int
 
     @classmethod
@@ -29,47 +31,44 @@ class Benchmark:
             func_name=func_name,
             param1=int(params[0]),
             param2=int(params[1]),
+            param3=int(params[2]),
             cpu_time_ns=time_ns,
             cpu_time_ms=int(time_ns/1000),
+            real_time_ms=int(bm["real_time"]/1000),
             iterations=int(bm["iterations"]),
         )
 
 #%%
-with open("./bench_fftconv.json") as fp:
+fname = "./bench_pocketfft_hdr_thread.json"
+with open(fname) as fp:
     data = json.load(fp)
 
 context = data["context"]
 date = context["date"].rsplit("-", 1)[0]
 benchmark = data["benchmarks"][0]
-# pprint(benchmark)
+pprint(benchmark)
 
 bms = [Benchmark.from_json(bm) for bm in data["benchmarks"]]
 df = pd.DataFrame(bms)
 df.head()
 
 # %%
-df = df[df.func_name.str.startswith("BM_oaconvolve")]
-# df = df[df.func_name.str.endswith("naive") == False]
-df
 
 # %%
-param2unique = df["param2"].unique()
-assert len(param2unique) == 4 # change subplot otherwise
-fig, axes = plt.subplots(2, 2, figsize=(10, 8), sharex=True)
-for ax, param2 in zip(axes.flatten(), param2unique):
-    # group by param2 (second input to bench range, kernel length)
-    groupby = df[df["param2"] == param2].groupby("func_name")
-    # plot CPU time
-    groupby.plot(x="param1", y="cpu_time_ms", ax=ax, marker="x", markeredgewidth=2.0)
-    ax.set_xlabel("Signal Length")
-    ax.set_ylabel("Time (ms)")
-    ax.set_ylim(ymin=0)
-    # Remove BM_prefix from function name for label
-    labels = [k.removeprefix("BM_") for k in groupby.groups.keys()]
-    ax.legend(labels)
-    ax.set_title(f"Kernel length = {param2}")
+param2s = df["param2"].unique()
+assert len(param2s) == 1
+param2 = param2s[0]
 
-fig.suptitle("Overlap-Add Convolution (C++)")
-plt.savefig(f"bench_{date}.svg")
+param1s = df["param1"].unique()
+fig, axes = plt.subplots(2, 2, figsize=(10, 8), sharex=True)
+for ax, param1 in zip(axes.flatten(), param1s):
+    df[df["param1"] == param1].plot.bar(x="param3", y="real_time_ms", ax=ax)
+    ax.set_ylabel("Real time (ms)")
+    ax.set_xlabel("n threads")
+    ax.set_title(f"convolve_pocketfft ({param1}, {param2})")
+    ax.legend([])
+fig.suptitle("convolve_pocketfft_hdr scaling with nthreads")
+plt.savefig(f"{fname}.svg")
+
 
 # %%
