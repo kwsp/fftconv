@@ -279,6 +279,7 @@ void oaconvolve_fftw(const double *x, const size_t x_sz, const double *h,
 
   // create forward/backward ffts for x
   const auto real_buf = plan->get_real_buf();
+  const double fct = 1. / N;
   for (size_t pos = 0; pos < x_sz; pos += step_size) {
     size_t len = std::min(x_sz - pos, step_size); // bound check
     plan->set_real_buf(x + pos, len);
@@ -290,7 +291,7 @@ void oaconvolve_fftw(const double *x, const size_t x_sz, const double *h,
     // normalize output and add to result
     len = std::min(y_sz - pos, N);
     for (size_t i = 0; i < len; ++i)
-      y[pos + i] += real_buf[i] / N;
+      y[pos + i] += real_buf[i] * fct;
   }
 }
 
