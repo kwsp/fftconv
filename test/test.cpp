@@ -7,11 +7,11 @@
 #include <string>
 #include <vector>
 
-#include "fftconv.h"        // fftw impl
-#include "fftconv_pocket.h" // pocketfft impl
+#include "fftconv.hpp"        // fftw impl
+#include "fftconv_pocket.hpp" // pocketfft impl
 #include <armadillo>
 
-#include "test_helpers.h"
+#include "test_helpers.hpp"
 
 using std::cout;
 using std::string;
@@ -47,7 +47,7 @@ void _test(const vector<double> &a, const vector<double> &b) {
   auto gt = convolve_naive(a, b);
   auto cmp = [&](const std::string &name, vector<double> res) {
     if (!cmp_vec(gt, res)) {
-      cout << "gt vs " << name << " ";
+      cout << "gt vs " << name << "\n";
       cout << "ground truth: ";
       print_vec(gt);
       cout << name << ":";
@@ -62,6 +62,7 @@ void _test(const vector<double> &a, const vector<double> &b) {
 
   using namespace fftconv;
   CMP(convolve_fftw);
+  CMP(convolve_fftw_advanced);
   CMP(oaconvolve_fftw);
   CMP(convolve_pocketfft);
   CMP(oaconvolve_pocketfft);
@@ -88,6 +89,7 @@ void _bench(const vector<double> &a, const vector<double> &b) {
   // TIMEIT(fftconv::fftconv_ref, a, b);
   using namespace fftconv;
   TIMEIT(convolve_fftw, a, b);
+  TIMEIT(convolve_fftw_advanced, a, b);
   TIMEIT(oaconvolve_fftw, a, b);
   TIMEIT(convolve_pocketfft, a, b);
   TIMEIT(oaconvolve_pocketfft, a, b);
@@ -112,11 +114,11 @@ vector<double> get_vec(size_t size) {
 }
 
 int main() {
-  // test_a_case({0, 1, 2, 3, 4, 5, 6, 7}, {0, 1, 2, 3});
-  // test_a_case(get_vec(22), get_vec(10));
+   //test_a_case({0, 1, 2, 3, 4, 5, 6, 7}, {0, 1, 2, 3});
+  //test_a_case(get_vec(22), get_vec(10));
   test_a_case(get_vec(1664), get_vec(65));
   test_a_case(get_vec(2816), get_vec(65));
-  test_a_case(get_vec(2304), get_vec(65));
-  test_a_case(get_vec(4352), get_vec(65));
+   test_a_case(get_vec(2304), get_vec(65));
+   test_a_case(get_vec(4352), get_vec(65));
   // test_a_case(get_vec(2000), get_vec(2000));
 }

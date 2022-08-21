@@ -3,7 +3,7 @@
 #include <functional>
 #include <vector>
 
-#include "fftconv_pocket.h"
+#include "fftconv_pocket.hpp"
 
 using std::vector;
 

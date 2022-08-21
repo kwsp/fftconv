@@ -105,21 +105,6 @@ void elementwise_multiply_half_cx(const T *a, const T *b, const size_t length,
     result[length - 1] = a[length - 1] * b[length - 1];
 }
 
-template <class T> inline void print(const T *a, const size_t sz) {
-  for (size_t i = 0; i < sz; ++i)
-    std::cout << a[i] << ", ";
-  std::cout << "\n";
-}
-template <class T>
-inline void print(const std::complex<T> *a, const size_t sz) {
-  for (size_t i = 0; i < sz; ++i)
-    std::cout << "(" << a[i].real() << ", " << a[i].imag() << "), ";
-  std::cout << "\n";
-}
-template <class T> inline void print(const std::vector<T> &a) {
-  print(a.data(), a.size());
-}
-
 namespace fftconv {
 
 template <class T> struct Bufs {
