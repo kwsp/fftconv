@@ -83,29 +83,23 @@ VECTOR_WRAPPER(oaconvolve_fftw_advanced)
 
 // arma::vec interface
 #ifdef ARMA_WRAPPER
-ARMA_WRAPPER(fftconv)
-ARMA_WRAPPER(fftconv_ref)
-ARMA_WRAPPER(fftconv_oa)
+ARMA_WRAPPER(convolve_fftw)
+ARMA_WRAPPER(convolve_fftw_advanced)
+ARMA_WRAPPER(convolve_fftw_ref)
+ARMA_WRAPPER(oaconvolve_fftw)
+ARMA_WRAPPER(oaconvolve_fftw_advanced)
 #endif
 
 // In memory cache with key type K and value type V
-// V's constructor must take K as input
-template <class K, class V> class Cache {
-public:
-  // Get a cached object if available.
-  // Otherwise, a new one will be constructed.
-  V *get(K key) {
-    auto &val = _cache[key];
-    if (val == nullptr)
-      val = std::make_unique<V>(key);
-    return val.get();
-  }
+template <class K, class V> V *_get_cached(K key) {
+  static thread_local std::unordered_map<K, std::unique_ptr<V>> _cache;
 
-  V *operator()(K key) { return get(key); }
+  auto &val = _cache[key];
+  if (val == nullptr)
+    val = std::make_unique<V>(key);
 
-private:
-  std::unordered_map<K, std::unique_ptr<V>> _cache;
-};
+  return val.get();
+}
 
 } // namespace fftconv
 

@@ -198,7 +198,8 @@ public:
   }
 };
 
-static thread_local fftconv::Cache<size_t, fftconv_plans> fftconv_plans_cache;
+constexpr auto fftconv_plans_cache =
+    fftconv::_get_cached<size_t, fftconv_plans>;
 
 // fftconv_plans manages the memory of the forward and backward fft plans
 // and the fftw buffers
@@ -222,25 +223,25 @@ struct fftconv_plans_advanced {
   fftw_plan plan_forward_signal;
   fftw_plan plan_backward_signal;
 
-  void debug_print() {
-#define PRINT(NAME) std::cout << #NAME << " (" << NAME << ") "
-    PRINT(real_sz);
-    PRINT(complex_sz);
-    PRINT(howmany);
-    std::cout << "\n";
+  // void debug_print() {
+  //#define PRINT(NAME) std::cout << #NAME << " (" << NAME << ") "
+  // PRINT(real_sz);
+  // PRINT(complex_sz);
+  // PRINT(howmany);
+  // std::cout << "\n";
 
-    std::cout << "real_buf_kernel";
-    print(real_buf_kernel, real_sz);
+  // std::cout << "real_buf_kernel";
+  // print(real_buf_kernel, real_sz);
 
-    std::cout << "cx_buf_kernel";
-    print(cx_buf_kernel, complex_sz);
+  // std::cout << "cx_buf_kernel";
+  // print(cx_buf_kernel, complex_sz);
 
-    std::cout << "real_buf_signal";
-    print(real_buf_signal, real_sz * howmany);
+  // std::cout << "real_buf_signal";
+  // print(real_buf_signal, real_sz * howmany);
 
-    std::cout << "cx_buf_signal";
-    print(cx_buf_signal, complex_sz * howmany);
-  }
+  // std::cout << "cx_buf_signal";
+  // print(cx_buf_signal, complex_sz * howmany);
+  //}
 
   // Use advanced interface
   fftconv_plans_advanced(const size_t padded_length, const int howmany)
@@ -336,7 +337,7 @@ struct fftconv_plans_advanced {
 
   void get_output(double *arr, size_t sz, const size_t idx) {
     const double fct = 1. / real_sz;
-    sz = std::min(real_sz, sz);
+    sz = std::min<size_t>(real_sz, sz);
 
     const size_t pos = idx * real_sz;
     for (int i = 0; i < sz; ++i)
@@ -374,7 +375,7 @@ void convolve_fftw(const double *a, const size_t a_sz, const double *b,
 
   // copy normalized to result
   const auto real_buf = plan->get_real_buf();
-  const size_t end = std::min(padded_length, res_sz);
+  const size_t end = std::min<size_t>(padded_length, res_sz);
   for (int i = 0; i < end; i++)
     result[i] = real_buf[i];
 }
@@ -443,7 +444,7 @@ void convolve_fftw_ref(const double *a, const size_t a_sz, const double *b,
   fftw_execute_dft_c2r(plan_backward, input_buffer, output_buffer);
 
   // Normalize output
-  for (int i = 0; i < std::min(padded_length, result_sz); i++)
+  for (int i = 0; i < std::min<size_t>(padded_length, result_sz); i++)
     result[i] = output_buffer[i] / padded_length;
 
   fftw_free(a_buf);
@@ -481,7 +482,7 @@ void oaconvolve_fftw(const double *x, const size_t x_sz, const double *h,
   const auto real_buf = plan->get_real_buf();
   const double fct = 1. / N;
   for (size_t pos = 0; pos < x_sz; pos += step_size) {
-    size_t len = std::min(x_sz - pos, step_size); // bound check
+    size_t len = std::min<size_t>(x_sz - pos, step_size); // bound check
     plan->set_real_buf(x + pos, len);
     plan->forward_a();
     plan->complex_multiply_to_a();
@@ -489,7 +490,7 @@ void oaconvolve_fftw(const double *x, const size_t x_sz, const double *h,
     // plan->normalize(); // normalize later in the copy loop
 
     // normalize output and add to result
-    len = std::min(y_sz - pos, N);
+    len = std::min<size_t>(y_sz - pos, N);
     for (size_t i = 0; i < len; ++i)
       y[pos + i] += real_buf[i] * fct;
   }
@@ -509,7 +510,7 @@ void oaconvolve_fftw_advanced(const double *x, const size_t x_sz,
 
   // Copy data to plan
   for (size_t pos = 0, idx = 0; pos < x_sz; pos += step_size, idx++) {
-    size_t len = std::min(x_sz - pos, step_size); // bound check
+    size_t len = std::min<size_t>(x_sz - pos, step_size); // bound check
     plans->set_signal(x + pos, len, idx);
   }
 
@@ -520,7 +521,7 @@ void oaconvolve_fftw_advanced(const double *x, const size_t x_sz,
   plans->backward();
 
   for (size_t pos = 0, idx = 0; pos < y_sz; pos += step_size, idx++) {
-    size_t len = std::min(y_sz - pos, N); // bound check
+    size_t len = std::min<size_t>(y_sz - pos, N); // bound check
     plans->get_output(y + pos, len, idx);
   }
 }
