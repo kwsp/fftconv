@@ -70,11 +70,16 @@ void convolve_fftw_ref(const double *a, const size_t a_sz, const double *b,
 void oaconvolve_fftw(const double *x, const size_t x_sz, const double *h,
                      const size_t h_sz, double *y, const size_t y_sz);
 
+void oaconvolve_fftw_advanced(const double *x, const size_t x_sz,
+                              const double *h, const size_t h_sz, double *y,
+                              const size_t y_sz);
+
 // std::vector interface to the fftconv routines
 VECTOR_WRAPPER(convolve_fftw)
 VECTOR_WRAPPER(convolve_fftw_advanced)
 VECTOR_WRAPPER(convolve_fftw_ref)
 VECTOR_WRAPPER(oaconvolve_fftw)
+VECTOR_WRAPPER(oaconvolve_fftw_advanced)
 
 // arma::vec interface
 #ifdef ARMA_WRAPPER
