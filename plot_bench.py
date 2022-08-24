@@ -40,6 +40,7 @@ with open("./bench_fftconv.json") as fp:
 
 context = data["context"]
 date = context["date"].rsplit("-", 1)[0]
+date = date.replace(":", "-")
 benchmark = data["benchmarks"][0]
 # pprint(benchmark)
 
