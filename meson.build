@@ -6,12 +6,15 @@ project(
   default_options : [ # https://mesonbuild.com/Builtin-options.html
     'warning_level=3', 
     'cpp_std=c++14',
+    'c_std=c11',
+    'debug=true',  # debug symbols
     'buildtype=release',
     'optimization=3',
-    'debug=true',  # debug symbols
   ]
 )
 add_project_arguments('-Wno-sign-compare', language: 'cpp')
+add_project_arguments('-mavx2', language: 'cpp')
+add_project_arguments('-mavx2', language: 'c')
 
 
 fftconv_src = [
