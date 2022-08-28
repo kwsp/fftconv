@@ -54,7 +54,7 @@ The `fftconv_test` binary gives an easy benchmark that runs every test case 5000
 
 Output from `fftconv_bench` (accurate bench) raw result saved in `./bench_result.json`. Plot generated from `plot_bench.py`:
 
-![Comparison of the Overlap-Add method implemented with `fftw`, `pocketfft`, and `pocketfft_hdronly`](./bench_2022-08-14T01%3A47%3A26.svg)
+![Comparison of the Overlap-Add method implemented with `fftw`, `pocketfft`, and `pocketfft_hdronly`](./bench_2022-08-21T23-11-01.svg)
 
 Output from `fftconv_test` (simple bench)
 
