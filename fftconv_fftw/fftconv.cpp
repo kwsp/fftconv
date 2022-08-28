@@ -8,6 +8,7 @@
 #include <complex>
 #include <cstring>
 #include <debug_utils.hpp>
+#include <sys/types.h>
 
 std::mutex *_fftw_mutex = nullptr;
 
@@ -207,9 +208,9 @@ constexpr auto fftconv_plans_cache =
 // https://www.fftw.org/fftw3_doc/New_002darray-Execute-Functions.html
 struct fftconv_plans_advanced {
   // FFTW buffer sizes
-  const size_t real_sz;
-  const size_t complex_sz;
-  const int howmany;
+  const size_t _real_sz;
+  const size_t _complex_sz;
+  const int _howmany;
 
   // FFTW buffers corresponding to the above plans
   double *real_buf_signal;
@@ -245,17 +246,17 @@ struct fftconv_plans_advanced {
 
   // Use advanced interface
   fftconv_plans_advanced(const size_t padded_length, const int howmany)
-      : real_sz(padded_length), complex_sz(padded_length / 2 + 1),
-        howmany(howmany) {
+      : _real_sz(padded_length), _complex_sz(padded_length / 2 + 1),
+        _howmany(howmany) {
 
     if (_fftw_mutex)
       _fftw_mutex->lock();
 
-    real_buf_signal = fftw_alloc_real(real_sz * howmany);
-    cx_buf_signal = fftw_alloc_complex(complex_sz * howmany);
+    real_buf_signal = fftw_alloc_real(_real_sz * howmany);
+    cx_buf_signal = fftw_alloc_complex(_complex_sz * howmany);
 
-    real_buf_kernel = fftw_alloc_real(real_sz);
-    cx_buf_kernel = fftw_alloc_complex(complex_sz);
+    real_buf_kernel = fftw_alloc_real(_real_sz);
+    cx_buf_kernel = fftw_alloc_complex(_complex_sz);
 
     // `howmany` is the (nonnegative) number of transforms to compute.
     // - The resulting plan computs `howmany` transforms, where the input of
@@ -265,7 +266,7 @@ struct fftconv_plans_advanced {
     // int howmany;
 
     int rank = 1; // Dimensions of each transform.
-    const int n[] = {(int)real_sz};
+    const int n[] = {(int)_real_sz};
 
     double *in = real_buf_signal;
     fftw_complex *out = cx_buf_signal;
@@ -275,9 +276,9 @@ struct fftconv_plans_advanced {
     const int *nembed = NULL;
 
     int stride = 1;
-    int idist = real_sz, odist = complex_sz;
+    int idist = _real_sz, odist = _complex_sz;
 
-    plan_forward_kernel = fftw_plan_dft_r2c_1d(real_sz, real_buf_kernel,
+    plan_forward_kernel = fftw_plan_dft_r2c_1d(_real_sz, real_buf_kernel,
                                                cx_buf_kernel, FFTW_ESTIMATE);
 
     plan_forward_signal =
@@ -305,15 +306,15 @@ struct fftconv_plans_advanced {
   }
 
   void set_kernel(const double *arr, size_t sz) {
-    assert(sz <= real_sz);
-    _copy_to_padded_buffer(arr, sz, real_buf_kernel, real_sz);
+    assert(sz <= _real_sz);
+    _copy_to_padded_buffer(arr, sz, real_buf_kernel, _real_sz);
   }
 
   // i-th `howmany`
   void set_signal(const double *arr, const size_t sz, const size_t idx) {
-    assert(sz <= real_sz);
-    assert(idx <= howmany);
-    _copy_to_padded_buffer(arr, sz, real_buf_signal + idx * real_sz, real_sz);
+    assert(sz <= _real_sz);
+    assert(idx <= _howmany);
+    _copy_to_padded_buffer(arr, sz, real_buf_signal + idx * _real_sz, _real_sz);
   }
 
   void forward_kernel() {
@@ -330,16 +331,16 @@ struct fftconv_plans_advanced {
   }
 
   void complex_multiply() {
-    for (int i = 0; i < howmany; ++i)
-      elementwise_multiply(cx_buf_signal + i * complex_sz, cx_buf_kernel,
-                           complex_sz, cx_buf_signal + i * complex_sz);
+    for (int i = 0; i < _howmany; ++i)
+      elementwise_multiply(cx_buf_signal + i * _complex_sz, cx_buf_kernel,
+                           _complex_sz, cx_buf_signal + i * _complex_sz);
   }
 
   void get_output(double *arr, size_t sz, const size_t idx) {
-    const double fct = 1. / real_sz;
-    sz = std::min<size_t>(real_sz, sz);
+    const double fct = 1. / _real_sz;
+    sz = std::min<size_t>(_real_sz, sz);
 
-    const size_t pos = idx * real_sz;
+    const size_t pos = idx * _real_sz;
     for (int i = 0; i < sz; ++i)
       arr[i] += real_buf_signal[pos + i] * fct;
   }
@@ -353,7 +354,7 @@ fftconv_plans_advanced *fftconv_plans_advanced_cache(const size_t padded_length,
   const size_t _hash = (padded_length << 4) ^ howmany;
 
   auto &plan = _cache[_hash];
-  if (plan == nullptr || plan->real_sz != padded_length)
+  if (plan == nullptr || plan->_real_sz != padded_length)
     plan = std::make_unique<fftconv_plans_advanced>(padded_length, howmany);
   return plan.get();
 }
