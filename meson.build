@@ -34,6 +34,7 @@ project_inc = include_directories(
   '.',
   './fftconv_fftw',
   './fftconv_pocketfft',
+  '/opt/homebrew/include'
 )
 
 # Dependencies
@@ -63,6 +64,10 @@ build_args += [
   '-DPROJECT_VERSION=' + meson.project_version(),
 ]
 
+# link gperftools
+#link_args = ['-Wl,--no-as-needed,-lprofiler,--as-needed' ]
+link_args = ['-lprofiler' ]
+
 executable(
   'test_fftconv',
   'test/test.cpp',
@@ -72,7 +77,7 @@ executable(
   install : false,
   c_args : build_args,
   cpp_args : build_args,
-  link_args: '-Wl,--no-as-needed,-lprofiler,--as-needed' # link gperftools
+  link_args: link_args
 )
 
 executable(
