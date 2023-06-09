@@ -1,13 +1,19 @@
 from setuptools import setup, Extension
 from Cython.Build import cythonize
 
+ext_libraries = [
+    ["pocketfft", {
+        "sources": ["./fftconv_pocketfft/pocketfft.c"],
+        "include_dirs": ["./fftconv_pocketfft"],
+    }]
+]
+
 extensions = [
     Extension(
         "fftconv",
         sources=[
             "./pyfftconv/*.pyx",
             "./fftconv_fftw/fftconv.cpp",
-            "./fftconv_pocketfft/pocketfft.c",
         ],
         include_dirs=[
             "./",
@@ -15,7 +21,7 @@ extensions = [
             "./fftconv_pocketfft",
             "/opt/homebrew/include",
         ],
-        libraries=["fftw3"],
+        libraries=["fftw3", "pocketfft"],
         library_dirs=["/opt/homebrew/lib"],
         extra_compile_args=["-std=c++17", "-Ofast", "-Wno-sign-compare"],
         language="c++",
@@ -23,6 +29,7 @@ extensions = [
 ]
 
 setup(
+    name="fftconv",
     install_requires=[
         "numpy",
         "scipy",
@@ -32,4 +39,5 @@ setup(
         compiler_directives={"language_level": "3"},
         annotate=True,
     ),
+    libraries=ext_libraries,
 )

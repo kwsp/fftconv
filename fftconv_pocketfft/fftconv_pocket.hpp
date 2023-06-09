@@ -162,7 +162,7 @@ template <class T> struct Bufs_half_cx {
   const pocketfft::stride_t stride_c;
 
   Bufs_half_cx(const size_t size_r)
-      : size_r(size_r), A_buf(new double[size_r]), B_buf(new double[size_r]),
+      : size_r(size_r), A_buf(new T[size_r]), B_buf(new T[size_r]),
         shape_r({size_r}), stride_r({sizeof(T)}), stride_c({sizeof(T)}) {}
 
   ~Bufs_half_cx() {
