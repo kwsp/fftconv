@@ -1,0 +1,15 @@
+{
+  "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json",
+  "name": "fftconv",
+  "version": "0.1.0",
+  "dependencies": [
+    "armadillo",
+    "benchmark",
+    {
+      "name": "fftw3",
+      "features": [
+        "avx2"
+      ]
+    }
+  ]
+}
