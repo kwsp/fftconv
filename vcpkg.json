@@ -7,9 +7,12 @@
     "benchmark",
     {
       "name": "fftw3",
-      "features": [
-        "avx2"
-      ]
+      "platform": "x64",
+      "features": ["avx2"]
+    },
+    {
+      "name": "fftw3",
+      "platform": "!x64"
     }
   ]
 }
