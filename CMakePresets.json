@@ -7,74 +7,94 @@
   },
   "configurePresets": [
     {
-      "name": "vs-2022-debug",
-      "displayName": "Visual Studio 2022 Debug",
-      "generator": "Visual Studio 17 2022",
-      "architecture": {
-        "value": "x64",
-        "strategy": "external"
-      },
-      "binaryDir": "${sourceDir}/build/${presetName}",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug"
-      },
-      "toolchainFile": "C:/src/vcpkg/scripts/buildsystems/vcpkg.cmake"
+      "name": "base",
+      "hidden": true,
+      "binaryDir": "build/${presetName}",
+      "installDir": "install/${presetName}",
+      "toolchainFile": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
     },
     {
-      "name": "vs-2022-release",
-      "displayName": "Visual Studio 2022 Release",
-      "generator": "Visual Studio 17 2022",
-      "architecture": {
-        "value": "x64",
-        "strategy": "external"
-      },
-      "binaryDir": "${sourceDir}/build/${presetName}",
+      "name": "debug",
+      "inherits": "base",
+      "displayName": "Debug",
+      "description": "Debug build with no special settings",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "RelWithDebugInfo"
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "release",
+      "inherits": "base",
+      "displayName": "Release",
+      "description": "Release build with no special settings",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "win64",
+      "displayName": "Win64 (Visual Studio 2022)",
+      "inherits": "base",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
       },
-      "toolchainFile": "C:/src/vcpkg/scripts/buildsystems/vcpkg.cmake"
+      "generator": "Visual Studio 17 2022",
+      "cacheVariables": {
+        "CMAKE_CXX_FLAGS": "/arch:AVX2",
+        "CMAKE_C_FLAGS": "/arch:AVX2"
+      }
+    },
+    {
+      "name": "clang",
+      "hidden": true,
+      "inherits": "base",
+      "generator": "Ninja",
+      "cacheVariables": {
+        "CMAKE_C_COMPILER": "clang",
+        "CMAKE_CXX_COMPILER": "clang++"
+      }
     },
     {
       "name": "clang-debug",
       "displayName": "Clang Debug",
-      "generator": "Ninja",
-      "binaryDir": "${sourceDir}/build/${presetName}",
+      "inherits": "clang",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug",
-        "CMAKE_C_COMPILER": "clang",
-        "CMAKE_CXX_COMPILER": "clang++"
-      },
-      "toolchainFile": "C:/src/vcpkg/scripts/buildsystems/vcpkg.cmake"
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
     },
     {
       "name": "clang-release",
       "displayName": "Clang Release",
-      "generator": "Ninja",
-      "binaryDir": "${sourceDir}/build/${presetName}",
+      "inherits": "clang",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release",
-        "CMAKE_C_COMPILER": "clang",
-        "CMAKE_CXX_COMPILER": "clang++"
-      },
-      "toolchainFile": "C:/src/vcpkg/scripts/buildsystems/vcpkg.cmake"
+        "CMAKE_BUILD_TYPE": "Release"
+      }
     }
   ],
   "buildPresets": [
     {
-      "name": "vs-2022-debug-build",
-      "configurePreset": "vs-2022-debug"
+      "name": "debug",
+      "configurePreset": "debug",
+      "displayName": "Debug",
+      "description": "Debug build with no special settings"
     },
     {
-      "name": "vs-2022-release-build",
-      "configurePreset": "vs-2022-release"
+      "name": "release",
+      "configurePreset": "release",
+      "displayName": "Release",
+      "description": "Release build with no special settings"
     },
     {
-      "name": "clang-debug-build",
-      "configurePreset": "clang-debug"
+      "name": "Win64 Release",
+      "configurePreset": "win64",
+      "configuration": "Release"
     },
     {
-      "name": "clang-release-build",
-      "configurePreset": "clang-release"
+      "name": "Win64 Debug",
+      "configurePreset": "win64",
+      "configuration": "Debug"
     }
   ]
 }
