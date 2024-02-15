@@ -4,40 +4,43 @@ Extremely fast 1D discrete convolutions of real vectors.
 
 It's well know that convolution in the time domain is equivalent to multiplication in the frequency domain (circular convolution). With the Fast Fourier Transform, we can reduce the time complexity of a discrete convolution from `O(n^2)` to `O(n log(n))`, where `n` is the larger of the two array sizes. The **[overlap-add method](https://en.wikipedia.org/wiki/Overlap%E2%80%93add_method)** is a fast convolution method commonly use in FIR filtering, where the discrete signal is often much longer than the FIR filter kernel.
 
-* `fftconv::convolve_{fftw,pocketfft,pocketfft_hdr}` implement FFT convolution.
-* `fftconv::oaconvolve_{fftw,pocketfft,pocketfft_hdr}` implement FFT convolution using the overlap-add method, much faster when one sequence is much longer than the other (e.g. in FIR filtering).
+- `fftconv::convolve_fftw` implements FFT convolution.
+- `fftconv::oaconvolve_fftw` implements FFT convolution using the overlap-add method, much faster when one sequence is much longer than the other (e.g. in FIR filtering).
 
-In C++, All routines provide a C-array interface, a `std::vector` interface, and an `arma::vec` interface (if `<armadillo>` is included before `"fftconv.h"`).
+All convolution functions support `float` and `double` and use a C++20 `std::span` interface.
+
+```C++
+template <internal::FloatOrDouble Real>
+void oaconvolve_fftw(const std::span<const Real> arr,
+                     const std::span<const Real> kernel, std::span<Real> res);
+```
 
 Python bindings are provided through Cython.
 
 ## Build the test and benchmark
 
-**C++**
+Use VCPKG to manage the dependencies and CMake to build the project.
 
-`meson` and `ninja` are the build tools. The `fftw` implementation requires `fftw3`. The pocketfft source files are provided in the repo for convenience.
+The only dependency of `fftconv` is [fftw3](http://fftw.org/). Since the float and double interface of `fftw3` are used, you would need to link with `-lfftw -lfftwf`.
 
 Benchmark and test dependencies:
 
-* [fftw3](http://fftw.org/)
-* [armadillo](http://arma.sourceforge.net/) (benchmarked against as a baseline)
-* [google-benchmark](https://github.com/google/benchmark) used for benchmarking.
-* [gperftools](https://github.com/gperftools/gperftools) used for profiling.
-
-```
-meson build
-ninja -C build
-```
+- [fftw3](http://fftw.org/)
+- [armadillo](http://arma.sourceforge.net/) (benchmarked against as a baseline)
+- [google-benchmark](https://github.com/google/benchmark) used for benchmarking.
+- [gperftools](https://github.com/gperftools/gperftools) used for profiling.
 
 **Python**
 
+TODO The Python wrapper is currently out of date.
+
 A Cython wrapper is provided. Dependencies:
 
-* `Cython` for C++ bindings
-* `numpy` (benchmarked against)
-* `numba` (benchmarked against)
-* `scipy` (benchmarked against)
-* `matplotlib` (plot results)
+- `Cython` for C++ bindings
+- `numpy` (benchmarked against)
+- `numba` (benchmarked against)
+- `scipy` (benchmarked against)
+- `matplotlib` (plot results)
 
 ```
 python3 setup.py build_ext -i
