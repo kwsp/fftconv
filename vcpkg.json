@@ -5,6 +5,7 @@
   "dependencies": [
     "armadillo",
     "benchmark",
+    "gtest",
     {
       "name": "fftw3",
       "platform": "x64",
