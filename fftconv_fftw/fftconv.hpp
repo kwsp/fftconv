@@ -413,14 +413,17 @@ template <> struct fftw_plans_1d<double> {
 // Since FFTW planners are not thread-safe, you can pass a pointer to a
 // std::mutex to fftconv and all calls to the planner with be guarded by the
 // mutex.
-void use_fftw_mutex(std::mutex *fftw_mutex) {
+inline void use_fftw_mutex(std::mutex *fftw_mutex) {
   internal::fftconv_fftw_mutex = fftw_mutex;
 }
-auto get_fftw_mutex() -> std::mutex * { return internal::fftconv_fftw_mutex; };
+inline auto get_fftw_mutex() -> std::mutex * {
+  return internal::fftconv_fftw_mutex;
+};
 
 // Reference implementation of fft convolution with minimal optimizations
-void convolve_fftw_ref(std::span<const double> arr1,
-                       std::span<const double> arr2, std::span<double> res);
+static void convolve_fftw_ref(std::span<const double> arr1,
+                              std::span<const double> arr2,
+                              std::span<double> res);
 
 // fft_plans manages the memory of the forward and backward fft plans
 // and the fftw buffers
