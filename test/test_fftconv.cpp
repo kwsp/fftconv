@@ -1,4 +1,4 @@
-// NOLINTBEGIN(*-magic-numbers)
+// NOLINTBEGIN(*-magic-numbers,*-array-index)
 #include <armadillo>
 #include <array>
 #include <complex>
@@ -326,7 +326,7 @@ void execute_oaconv_same_correctly(Func conv_func) {
 TEST(OAConvolveSame, ExecuteCorrectly) {
   execute_oaconv_same_correctly<double>(fftconv::oaconvolve_fftw_same<double>);
 
-  // execute_oaconv_same_correctly<float>(fftconv::oaconvolve_fftw_same<float>);
+  execute_oaconv_same_correctly<float>(fftconv::oaconvolve_fftw_same<float>);
 }
 
-// NOLINTEND(*-magic-numbers)
+// NOLINTEND(*-magic-numbers,*-array-index)

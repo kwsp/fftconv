@@ -30,7 +30,9 @@ concept FFTWBufferSupported = FloatOrDouble<T> || FFTWComplex<T>;
 
 namespace internal {
 
+// NOLINTBEGIN(*-global-variables)
 static std::mutex *fftconv_fftw_mutex = nullptr;
+// NOLINTEND(*-global-variables)
 
 // static int nextpow2(int x) { return 1 << (int)(std::log2(x) + 1); }
 // Lookup table of {max_filter_size, optimal_fft_size}
@@ -148,6 +150,33 @@ inline void elementwise_multiply(std::span<const T> complex1,
   }
 }
 
+template <FFTWBufferSupported T> constexpr auto _fftw_alloc(const size_t size) {
+  if constexpr (std::is_same_v<T, double>) {
+    return static_cast<T *>(fftw_alloc_real(size));
+  } else if constexpr (std::is_same_v<T, fftw_complex>) {
+    return static_cast<T *>(fftw_alloc_complex(size));
+  } else if constexpr (std::is_same_v<T, float>) {
+    return static_cast<T *>(fftwf_alloc_real(size));
+  } else if constexpr (std::is_same_v<T, fftwf_complex>) {
+    return static_cast<T *>(fftwf_alloc_complex(size));
+  } else {
+    static_assert(false, "Cannot allocate fftw buffer of type");
+  }
+}
+
+template <FFTWBufferSupported T> constexpr void _fftw_free(T *ptr) {
+  if (ptr != nullptr) {
+    if constexpr (std::is_same_v<T, double> ||
+                  std::is_same_v<T, fftw_complex>) {
+      fftw_free(ptr);
+    } else if constexpr (std::is_same_v<T, float> ||
+                         std::is_same_v<T, fftwf_complex>) {
+      fftwf_free(ptr);
+    } else {
+      static_assert(false, "Cannot free non fftw pointer");
+    }
+  }
+}
 /// @brief Encapsulate FFTW allocated buffer
 /// @tparam T
 template <FFTWBufferSupported T> class fftw_buffer {
@@ -158,8 +187,8 @@ public:
       -> fftw_buffer & = delete;                            // Copy assignment
   auto operator=(fftw_buffer &&) -> fftw_buffer & = delete; // Move assignment
 
-  explicit fftw_buffer(size_t size) : m_size(size), m_data(fftw_alloc(size)) {
-    std::memset(m_data, 0, sizeof(T) * m_size);
+  explicit fftw_buffer(size_t size) : m_data(_fftw_alloc<T>(size), size) {
+    std::memset(m_data.data(), 0, sizeof(T) * m_data.size());
   }
 
   fftw_buffer(std::initializer_list<T> list) : fftw_buffer(list.size()) {
@@ -167,54 +196,29 @@ public:
   }
 
   // Destructor
-  ~fftw_buffer() {
-    if (m_data != nullptr) {
-      if constexpr (std::is_same_v<T, double> ||
-                    std::is_same_v<T, fftw_complex>) {
-        fftw_free(m_data);
-      } else if constexpr (std::is_same_v<T, float> ||
-                           std::is_same_v<T, fftwf_complex>) {
-        fftwf_free(m_data);
-      }
-    }
-  }
+  ~fftw_buffer() { _fftw_free(m_data.data()); }
 
-  using iterator = T *;
-  using const_iterator = const T *;
-  auto begin() noexcept { return iterator(m_data); }
-  auto end() noexcept { return iterator(m_data + m_size); }
-  [[nodiscard]] auto begin() const noexcept { return iterator(m_data); }
-  [[nodiscard]] auto end() const noexcept { return iterator(m_data + m_size); }
+  auto begin() noexcept { return m_data.begin(); }
+  auto end() noexcept { return m_data.end(); }
+  [[nodiscard]] auto begin() const noexcept { return m_data.begin(); }
+  [[nodiscard]] auto end() const noexcept { return m_data.end(); }
 
   auto operator[](size_t idx) -> auto & { return m_data[idx]; }
   auto operator[](size_t idx) const -> const auto & { return m_data[idx]; }
 
-  [[nodiscard]] auto size() const { return m_size; }
-  [[nodiscard]] auto data() const { return m_data; }
+  [[nodiscard]] auto size() const { return m_data.size(); }
+  [[nodiscard]] auto data() const { return m_data.data(); }
 
   // return a span-like view of the data
   [[nodiscard]] auto cspan() const -> std::span<const T> {
-    return {m_data, m_size}; // Create a span pointing to data with size
+    return m_data; // Create a span pointing to data with size
   }
   [[nodiscard]] auto span() -> std::span<T> {
-    return {m_data, m_size}; // Create a span pointing to data with size
+    return m_data; // Create a span pointing to data with size
   }
 
 private:
-  static constexpr auto fftw_alloc(const size_t size) {
-    if constexpr (std::is_same_v<T, double>) {
-      return static_cast<T *>(fftw_alloc_real(size));
-    } else if constexpr (std::is_same_v<T, fftw_complex>) {
-      return static_cast<T *>(fftw_alloc_complex(size));
-    } else if constexpr (std::is_same_v<T, float>) {
-      return static_cast<T *>(fftwf_alloc_real(size));
-    } else if constexpr (std::is_same_v<T, fftwf_complex>) {
-      return static_cast<T *>(fftwf_alloc_complex(size));
-    }
-  }
-
-  T *m_data;
-  size_t m_size;
+  std::span<T> m_data;
 };
 
 template <FloatOrDouble> struct fftw_plans_traits {};
@@ -422,11 +426,6 @@ inline auto get_fftw_mutex() -> std::mutex * {
   return internal::fftconv_fftw_mutex;
 };
 
-// Reference implementation of fft convolution with minimal optimizations
-static void convolve_fftw_ref(std::span<const double> arr1,
-                              std::span<const double> arr2,
-                              std::span<double> res);
-
 // fft_plans manages the memory of the forward and backward fft plans
 // and the fftw buffers
 //
@@ -525,6 +524,7 @@ public:
                        const std::span<const Real> kernel,
                        std::span<Real> res) {
     assert(real.size() == internal::get_optimal_fft_size(kernel.size()));
+    assert(arr.size() == res.size());
     const auto fft_size = real.size();
     const auto step_size = fft_size - (kernel.size() - 1);
 
@@ -533,15 +533,14 @@ public:
     internal::copy_to_padded_buffer(kernel, real_span);
     plans.forward(real, complex2);
 
-    const auto copy_start = kernel.size() / 2;
-    const int64_t conv_size_full = arr.size() + kernel.size() - 1;
+    const int64_t copy_start = kernel.size() / 2;
 
     // create forward/backward ffts for x
     // Normalization factor
     const double fct = 1. / static_cast<Real>(fft_size);
     const int64_t ksize_half = kernel.size() / 2;
     for (int64_t pos = 0; pos < arr.size(); pos += step_size) {
-      int64_t len = std::min<size_t>(arr.size() - pos, step_size);
+      const int64_t len = std::min<size_t>(arr.size() - pos, step_size);
 
       internal::copy_to_padded_buffer(arr.subspan(pos, len), real_span);
       plans.forward(real, complex1);
@@ -552,7 +551,7 @@ public:
       plans.backward(complex1, real);
 
       // normalize output and add to result
-      const int64_t loop_start = std::max<int64_t>(copy_start - pos, 0);
+      const int64_t loop_start = std::max<int64_t>(copy_start - pos, 0LL);
       const int64_t loop_end =
           std::min<int64_t>(res.size() - pos + copy_start, fft_size);
       for (size_t i = loop_start; i < loop_end; ++i) {
@@ -560,9 +559,6 @@ public:
         res[res_idx] += real[i] * fct;
       }
     }
-
-    // std::copy(res_full.begin() + copy_start,
-    //           res_full.begin() + copy_start + res.size(), res.begin());
   }
 
 private:
@@ -731,10 +727,14 @@ void oaconvolve_fftw_same(const std::span<const Real> arr,
   plan.oaconvolve_same(arr, kernel, res);
 }
 
-// reference implementation of fftconv with no optimizations
+// Reference implementation of fft convolution with minimal optimizations
+// Only supports double
+template <FloatOrDouble Real>
 void convolve_fftw_ref(const std::span<const double> arr1,
                        const std::span<const double> arr2,
-                       std::span<double> res) {
+                       std::span<double> res)
+  requires(std::is_same_v<Real, double>)
+{
   // length of the real arrays, including the final convolution output
   const size_t padded_length = arr1.size() + arr2.size() - 1;
   // length of the complex arrays
@@ -785,7 +785,9 @@ void convolve_fftw_ref(const std::span<const double> arr1,
 
   // Normalize output
   for (int i = 0; i < std::min<size_t>(padded_length, res.size()); i++) {
+    // NOLINTBEGIN(*-pointer-arithmetic)
     res[i] = output_buffer[i] / static_cast<double>(padded_length);
+    // NOLINTEND(*-pointer-arithmetic)
   }
 
   fftw_free(a_buf);
