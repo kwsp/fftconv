@@ -521,6 +521,50 @@ public:
     }
   }
 
+  void oaconvolve_same(const std::span<const Real> arr,
+                       const std::span<const Real> kernel,
+                       std::span<Real> res) {
+    assert(real.size() == internal::get_optimal_fft_size(kernel.size()));
+    const auto fft_size = real.size();
+    const auto step_size = fft_size - (kernel.size() - 1);
+
+    // forward fft of kernel and save to complex2
+    const auto real_span = real.span();
+    internal::copy_to_padded_buffer(kernel, real_span);
+    plans.forward(real, complex2);
+
+    const auto copy_start = kernel.size() / 2;
+    const int64_t conv_size_full = arr.size() + kernel.size() - 1;
+
+    // create forward/backward ffts for x
+    // Normalization factor
+    const double fct = 1. / static_cast<Real>(fft_size);
+    const int64_t ksize_half = kernel.size() / 2;
+    for (int64_t pos = 0; pos < arr.size(); pos += step_size) {
+      int64_t len = std::min<size_t>(arr.size() - pos, step_size);
+
+      internal::copy_to_padded_buffer(arr.subspan(pos, len), real_span);
+      plans.forward(real, complex1);
+
+      internal::elementwise_multiply(complex1.cspan(), complex2.cspan(),
+                                     complex1.span());
+
+      plans.backward(complex1, real);
+
+      // normalize output and add to result
+      const int64_t loop_start = std::max<int64_t>(copy_start - pos, 0);
+      const int64_t loop_end =
+          std::min<int64_t>(res.size() - pos + copy_start, fft_size);
+      for (size_t i = loop_start; i < loop_end; ++i) {
+        const auto res_idx = pos + i - copy_start;
+        res[res_idx] += real[i] * fct;
+      }
+    }
+
+    // std::copy(res_full.begin() + copy_start,
+    //           res_full.begin() + copy_start + res.size(), res.begin());
+  }
+
 private:
   // FFTW buffers
   internal::fftw_buffer<Real> real;
@@ -665,11 +709,26 @@ void convolve_fftw(const std::span<const Real> arr1,
 template <FloatOrDouble Real>
 void oaconvolve_fftw(const std::span<const Real> arr,
                      const std::span<const Real> kernel, std::span<Real> res) {
+  assert(arr.size() + kernel.size() - 1 == res.size());
+
   // Get cached plans
   auto &plan = fftconv_plans<Real>::get_for_kernel(kernel);
 
   // Execute FFT convolution and copy normalized result
   plan.oaconvolve(arr, kernel, res);
+}
+
+template <FloatOrDouble Real>
+void oaconvolve_fftw_same(const std::span<const Real> arr,
+                          const std::span<const Real> kernel,
+                          std::span<Real> res) {
+  assert(arr.size() == res.size());
+
+  // Get cached plans
+  auto &plan = fftconv_plans<Real>::get_for_kernel(kernel);
+
+  // Execute FFT convolution and copy normalized result
+  plan.oaconvolve_same(arr, kernel, res);
 }
 
 // reference implementation of fftconv with no optimizations
