@@ -458,6 +458,7 @@ public:
   // Results saved in real_buf
   void convolve(const std::span<const Real> arr,
                 const std::span<const Real> kernel, const std::span<Real> res) {
+    std::fill(res.begin(), res.end(), static_cast<Real>(0));
     const auto real_span = real.span();
 
     // Copy a to buffer
@@ -490,6 +491,8 @@ public:
   void oaconvolve(const std::span<const Real> arr,
                   const std::span<const Real> kernel, std::span<Real> res) {
     assert(real.size() == internal::get_optimal_fft_size(kernel.size()));
+    std::fill(res.begin(), res.end(), static_cast<Real>(0));
+
     const auto fft_size = real.size();
     const auto step_size = fft_size - (kernel.size() - 1);
 
@@ -525,6 +528,8 @@ public:
                        std::span<Real> res) {
     assert(real.size() == internal::get_optimal_fft_size(kernel.size()));
     assert(arr.size() == res.size());
+    std::fill(res.begin(), res.end(), static_cast<Real>(0));
+
     const auto fft_size = real.size();
     const auto step_size = fft_size - (kernel.size() - 1);
 
@@ -735,6 +740,8 @@ void convolve_fftw_ref(const std::span<const double> arr1,
                        std::span<double> res)
   requires(std::is_same_v<Real, double>)
 {
+  std::fill(res.begin(), res.end(), static_cast<Real>(0));
+
   // length of the real arrays, including the final convolution output
   const size_t padded_length = arr1.size() + arr2.size() - 1;
   // length of the complex arrays
