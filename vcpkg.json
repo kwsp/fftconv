@@ -15,5 +15,6 @@
       "name": "fftw3",
       "platform": "!x64"
     }
-  ]
+  ],
+  "builtin-baseline": "43d81795a513e2ca6648354786178714f33c8b6f"
 }
