@@ -159,8 +159,6 @@ template <FFTWBufferSupported T> constexpr auto _fftw_alloc(const size_t size) {
     return static_cast<T *>(fftwf_alloc_real(size));
   } else if constexpr (std::is_same_v<T, fftwf_complex>) {
     return static_cast<T *>(fftwf_alloc_complex(size));
-  } else {
-    static_assert(false, "Cannot allocate fftw buffer of type");
   }
 }
 
@@ -172,11 +170,10 @@ template <FFTWBufferSupported T> constexpr void _fftw_free(T *ptr) {
     } else if constexpr (std::is_same_v<T, float> ||
                          std::is_same_v<T, fftwf_complex>) {
       fftwf_free(ptr);
-    } else {
-      static_assert(false, "Cannot free non fftw pointer");
     }
   }
 }
+
 /// @brief Encapsulate FFTW allocated buffer
 /// @tparam T
 template <FFTWBufferSupported T> class fftw_buffer {
