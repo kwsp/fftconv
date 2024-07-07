@@ -500,7 +500,7 @@ public:
 
     // create forward/backward ffts for x
     // Normalization factor
-    const double fct = 1. / static_cast<Real>(fft_size);
+    const auto fct = static_cast<Real>(1. / fft_size);
     for (size_t pos = 0; pos < arr.size(); pos += step_size) {
       size_t len = std::min<size_t>(arr.size() - pos, step_size); // bound check
 
@@ -539,7 +539,7 @@ public:
 
     // create forward/backward ffts for x
     // Normalization factor
-    const double fct = 1. / static_cast<Real>(fft_size);
+    const auto fct = static_cast<Real>(1. / fft_size);
     const int64_t ksize_half = kernel.size() / 2;
     for (int64_t pos = 0; pos < arr.size(); pos += step_size) {
       const int64_t len = std::min<size_t>(arr.size() - pos, step_size);
