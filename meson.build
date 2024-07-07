@@ -64,7 +64,7 @@ build_args += [
 ]
 
 executable(
-  'fftconv_test',
+  'test_fftconv',
   'test/test.cpp',
   project_src,
   dependencies: project_dependencies,
@@ -76,8 +76,18 @@ executable(
 )
 
 executable(
-  'fftconv_bench',
-  'benchmark/bench.cpp',
+  'bench_fftconv',
+  'benchmark/bench_fftconv.cpp',
+  project_src,
+  dependencies: project_dependencies,
+  include_directories: project_inc,
+  install : false,
+  c_args : build_args,
+)
+
+executable(
+  'bench_pocketfft_hdr_thread',
+  'benchmark/bench_pocketfft_hdr_thread.cpp',
   project_src,
   dependencies: project_dependencies,
   include_directories: project_inc,
