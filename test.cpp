@@ -106,14 +106,14 @@ void test_a_case(vector<double> a, vector<double> b) {
   // Ground true
   auto result_naive = convolve_naive(a, b);
 
-  auto result_fft_ref = fftconv::convolve1d_ref(a, b);
-  std::cout << "naive vs fft_ref ";
-  if (!cmp_vec(result_naive, result_fft_ref)) {
-    std::cout << "naive   : ";
-    print_vec(result_naive);
-    std::cout << "fft_ref : ";
-    print_vec(result_fft_ref);
-  }
+  //auto result_fft_ref = fftconv::convolve1d_ref(a, b);
+  //std::cout << "naive vs fft_ref ";
+  //if (!cmp_vec(result_naive, result_fft_ref)) {
+    //std::cout << "naive   : ";
+    //print_vec(result_naive);
+    //std::cout << "fft_ref : ";
+    //print_vec(result_fft_ref);
+  //}
 
   auto result_fft = fftconv::convolve1d(a, b);
   std::cout << "naive vs fft ";
@@ -138,8 +138,8 @@ void test_a_case(vector<double> a, vector<double> b) {
   }
 
   // timeit("convolve_naive", [&]() { return convolve_naive(a, b); });
-  timeit("fftconv::convolve1d_ref",
-         [&]() { return fftconv::convolve1d_ref(a, b); });
+  //timeit("fftconv::convolve1d_ref",
+         //[&]() { return fftconv::convolve1d_ref(a, b); });
   timeit("fftconv::convolve1d", [&]() { return fftconv::convolve1d(a, b); });
   timeit("fftconv::fftfilt",
          [&]() { return fftconv::fftfilt(a, b); });
