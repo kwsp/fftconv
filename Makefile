@@ -1,7 +1,7 @@
 TARGET := fftconv_test
 
 BUILD_DIR := ./build
-SRC_DIRS := ./ ./src
+SRC_DIRS := ./ ./src ./src_pocketfft
 SRCS := test.cpp ./src/fftconv.cpp
 OBJS := $(SRCS:%=$(BUILD_DIR)/%.o)
 LDFLAGS := -lfftw3 -L/opt/homebrew/lib -larmadillo 
