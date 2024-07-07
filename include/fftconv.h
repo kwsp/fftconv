@@ -54,13 +54,11 @@ struct fftconv_plans {
 // Thread-safe
 class FFTW_PLAN_STORE {
 public:
-  //static FFTW_PLAN_STORE &Instance() {
-    //return instance;
-  //}
 
+  // Get the fftconv_plans instance for the input size
+  // If the instance doesn't exist, create it
   static std::shared_ptr<fftconv_plans> get(size_t size) {
     static FFTW_PLAN_STORE instance;
-    //auto& instance = FFTW_PLAN_STORE::Instance();
     if (auto plan = instance._get(size))
       return plan;
     return instance._get_set(size);
@@ -69,7 +67,6 @@ public:
 private:
   FFTW_PLAN_STORE() = default;
   ~FFTW_PLAN_STORE() = default;
-
 
   std::shared_ptr<fftconv_plans> _get(size_t size) {
     std::shared_lock read_lock(mutex_);
