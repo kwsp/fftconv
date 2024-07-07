@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 
+#include <armadillo>
 #include <omp.h>
 
 #include "fftconv.h"
@@ -14,7 +15,7 @@
 using std::cout;
 using std::vector;
 
-constexpr int N_RUNS = 1000;
+constexpr int N_RUNS = 5000;
 
 // This function computes the discrete convolution of two arrays:
 // result[i] = a[i]*b[0] + a[i-1]*b[1] + ... + a[0]*b[i]
@@ -38,7 +39,6 @@ vector<double> convolve_naive(const vector<double> &a,
   return result;
 }
 
-
 // Run the `callable` `n_runs` times and print the time.
 void timeit(string name, std::function<void()> callable, int n_runs = N_RUNS) {
   using namespace std::chrono;
@@ -49,6 +49,11 @@ void timeit(string name, std::function<void()> callable, int n_runs = N_RUNS) {
   auto elapsed =
       duration_cast<milliseconds>(high_resolution_clock::now() - start);
   cout << " took " << elapsed.count() << "ms\n";
+}
+
+// Wrapper to prevent it from being optimized away
+void arma_conv(arma::vec a, arma::vec b) {
+  volatile arma::vec res = arma::conv(a, b);
 }
 
 // Run a test case
@@ -65,10 +70,16 @@ void test_a_case(string fname) {
   auto result_fft = fftconv::convolve1d(tc.v1, tc.v2);
   cmp_vec(result_naive, result_fft);
 
-  timeit("convolve_naive", [&tc]() { convolve_naive(tc.v1, tc.v2); });
+  auto arma_v1 = arma::vec(tc.v1);
+  auto arma_v2 = arma::vec(tc.v2);
+  auto result_arma = arma::conv(arma_v1, arma_v2);
+
+  timeit("convolve_naive", [&tc]() { return convolve_naive(tc.v1, tc.v2); });
   timeit("ffconv::convolve1d_ref",
-         [&tc]() { fftconv::convolve1d_ref(tc.v1, tc.v2); });
-  timeit("ffconv::convolve1d", [&tc]() { fftconv::convolve1d(tc.v1, tc.v2); });
+         [&tc]() { return fftconv::convolve1d_ref(tc.v1, tc.v2); });
+  timeit("ffconv::convolve1d", [&tc]() { return fftconv::convolve1d(tc.v1, tc.v2); });
+  timeit("arma::conv",
+         [&arma_v1, &arma_v2]() { return arma_conv(arma_v1, arma_v2); });
 }
 
 int main() {
