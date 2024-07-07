@@ -1,3 +1,4 @@
+#include <array>
 #include <cstdlib>
 #include <cstring>
 #include <functional>
@@ -17,38 +18,39 @@ using std::string;
 using std::vector;
 
 // This function computes the discrete convolution of two arrays:
-// result[i] = a[i]*b[0] + a[i-1]*b[1] + ... + a[0]*b[i]
-vector<double> convolve_naive(const vector<double> &a,
-                              const vector<double> &b) {
-  const int n_a = a.size();
-  const int n_b = b.size();
+// result[i] = vec1[i]*vec2[0] + vec1[i-1]*vec2[1] + ... + vec1[0]*vec2[i]
+auto convolve_naive(const vector<double> &vec1, const vector<double> &vec2)
+    -> vector<double> {
+  const size_t n_a = vec1.size();
+  const size_t n_b = vec2.size();
   const size_t conv_sz = n_a + n_b - 1;
 
   vector<double> result(conv_sz);
 
   for (int i = 0; i < conv_sz; ++i) {
     double sum = 0.0;
-    for (int j = 0; j <= i; ++j)
-      sum += ((j < n_a) && (i - j < n_b)) ? a[j] * b[i - j] : 0.0;
+    for (int j = 0; j <= i; ++j) {
+      sum += ((j < n_a) && (i - j < n_b)) ? vec1[j] * vec2[i - j] : 0.0;
+    }
     result[i] = sum;
   }
   return result;
 }
 
 // Wrapper to prevent it from being optimized away
-void convolve_armadillo(const arma::vec &a, const arma::vec &b) {
-  volatile arma::vec res = arma::conv(a, b);
+void convolve_armadillo(const arma::vec &vec1, const arma::vec &vec2) {
+  volatile arma::vec res = arma::conv(vec1, vec2);
 }
 
-void _test(const vector<double> &a, const vector<double> &b) {
+void test(const vector<double> &vec1, const vector<double> &vec2) {
   using namespace test_helpers;
   // Ground true
-  auto gt = convolve_naive(a, b);
+  auto ground_truth = convolve_naive(vec1, vec2);
   auto cmp = [&](const std::string &name, const vector<double> &res) {
-    if (!cmp_vec(gt, res)) {
-      cout << "gt vs " << name << "\n";
+    if (!cmp_vec(ground_truth, res)) {
+      cout << "ground_truth vs " << name << "\n";
       cout << "ground truth: ";
-      print_vec(gt);
+      print_vec(ground_truth);
       cout << name << ":";
       print_vec(res);
       return false;
@@ -56,8 +58,8 @@ void _test(const vector<double> &a, const vector<double> &b) {
     return true;
   };
 
-  bool res = true;
-#define CMP(FUNC) res &= cmp(#FUNC, FUNC(a, b))
+  bool passed = true;
+#define CMP(FUNC) passed = cmp(#FUNC, FUNC(vec1, vec2))
 
   using namespace fftconv;
   CMP(convolve_fftw);
@@ -70,10 +72,11 @@ void _test(const vector<double> &a, const vector<double> &b) {
   // CMP(convolve_pocketfft_hdr);
   // CMP(oaconvolve_pocketfft_hdr);
 
-  if (res)
+  if (passed) {
     cout << "All tests passed.\n";
-  else
+  } else {
     cout << "Some tests failed.\n";
+  }
 }
 
 constexpr int N_RUNS = 5000;
@@ -81,58 +84,66 @@ constexpr int N_RUNS = 5000;
   test_helpers::_timeit(                                                       \
       #FUNC, [&]() { return FUNC(V1, V2); }, N_RUNS);
 
-void _bench(const vector<double> &a, const vector<double> &b) {
-  auto arma_a = arma::vec(a);
-  auto arma_b = arma::vec(b);
+void bench(const vector<double> &vec1, const vector<double> &vec2) {
+  auto arma_a = arma::vec(vec1);
+  auto arma_b = arma::vec(vec2);
   // auto result_arma = arma::conv(arma_a, arma_b);
 
-  // TIMEIT(convolve_naive, a, b);
-  // TIMEIT(fftconv::fftconv_ref, a, b);
+  // TIMEIT(convolve_naive, vec1, vec2);
+  // TIMEIT(fftconv::fftconv_ref, vec1, vec2);
   using namespace fftconv;
-  TIMEIT(convolve_fftw, a, b);
-  TIMEIT(convolve_fftw_advanced, a, b);
-  TIMEIT(oaconvolve_fftw, a, b);
-  TIMEIT(oaconvolve_fftw_advanced, a, b);
+  TIMEIT(convolve_fftw, vec1, vec2);
+  TIMEIT(convolve_fftw_advanced, vec1, vec2);
+  TIMEIT(oaconvolve_fftw, vec1, vec2);
+  TIMEIT(oaconvolve_fftw_advanced, vec1, vec2);
 
-  // TIMEIT(convolve_pocketfft, a, b);
-  // TIMEIT(oaconvolve_pocketfft, a, b);
-  // TIMEIT(convolve_pocketfft_hdr, a, b);
-  // TIMEIT(oaconvolve_pocketfft_hdr, a, b);
+  // TIMEIT(convolve_pocketfft, vec1, vec2);
+  // TIMEIT(oaconvolve_pocketfft, vec1, vec2);
+  // TIMEIT(convolve_pocketfft_hdr, vec1, vec2);
+  // TIMEIT(oaconvolve_pocketfft_hdr, vec1, vec2);
 
   TIMEIT(convolve_armadillo, arma_a, arma_b);
 }
 
-// Run a test case
-void test_a_case(const vector<double> &a, const vector<double> &b) {
-  printf("=== test case (%lu, %lu) ===\n", a.size(), b.size());
-  _test(a, b);
-  _bench(a, b);
+// Run vec1 test case
+void test_a_case(const vector<double> &vec1, const vector<double> &vec2) {
+  printf("=== test case (%lu, %lu) ===\n", vec1.size(), vec2.size());
+  test(vec1, vec2);
+  bench(vec1, vec2);
 }
 
-static vector<double> get_vec(size_t size) {
-  std::random_device r;
-  std::default_random_engine e(r());
+static auto get_vec(size_t size) -> vector<double> {
+  std::random_device rand_device;
+  std::default_random_engine engine(rand_device());
   std::uniform_real_distribution<double> dist(-1, 1);
 
   vector<double> res(size);
-  for (size_t i = 0; i < size; i++)
-    res[i] = dist(e);
+  for (size_t i = 0; i < size; i++) {
+    res[i] = dist(engine);
+  }
   return res;
 }
 
-static vector<double> arange(size_t size) {
+template <typename T> auto arange(size_t size) -> vector<T> {
   vector<double> res(size);
-  for (size_t i = 0; i < size; i++)
-    res[i] = i;
+  for (size_t i = 0; i < size; i++) {
+    res[i] = static_cast<T>(i);
+  }
   return res;
 }
 
-int main() {
+auto main() -> int {
   // test_a_case({0, 1, 2, 3, 4, 5, 6, 7}, {0, 1, 2, 3});
   // test_a_case(arange(25), arange(10));
-  test_a_case(get_vec(1664), get_vec(65));
-  test_a_case(get_vec(2816), get_vec(65));
-  test_a_case(get_vec(2304), get_vec(65));
-  test_a_case(get_vec(4352), get_vec(65));
-  //   test_a_case(get_vec(2000), get_vec(2000));
+
+  constexpr std::array<std::array<size_t, 2>, 4> test_sizes{{
+      {1664, 65},
+      {2816, 65},
+      {2304, 65},
+      {4352, 65},
+  }};
+
+  for (const auto &pair : test_sizes) {
+    test_a_case(get_vec(pair[0]), get_vec(pair[1]));
+  }
 }

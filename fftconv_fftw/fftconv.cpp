@@ -5,8 +5,10 @@
 #include <algorithm>
 #include <array>
 #include <cassert>
+#include <concepts>
 #include <cstddef>
 #include <cstring>
+#include <fftw3.h>
 
 #include "fftconv.hpp"
 
@@ -111,6 +113,52 @@ inline void elementwise_multiply(const fftw_complex *a, const fftw_complex *b,
 //}
 //};
 
+template <typename T>
+concept is_fftw_buffer_supported = requires() {
+  std::is_same_v<T, float> || std::is_same_v<T, double> ||
+      std::is_same_v<T, fftw_complex> || std::is_same_v<T, fftwf_complex>;
+};
+
+/// @brief Encapsulate FFTW allocated buffer
+/// @tparam T
+template <is_fftw_buffer_supported T> class fftw_buffer {
+public:
+  fftw_buffer(const fftw_buffer &) = delete;
+  fftw_buffer(fftw_buffer &&) = delete;
+  auto operator=(const fftw_buffer &) -> fftw_buffer & = delete;
+  auto operator=(fftw_buffer &&) -> fftw_buffer & = delete;
+
+  explicit fftw_buffer(size_t size) : m_size(size) {
+    if constexpr (std::is_same_v<T, double>) {
+      m_data = static_cast<T *>(fftw_alloc_real(size));
+    } else if constexpr (std::is_same_v<T, fftw_complex>) {
+      m_data = static_cast<T *>(fftw_alloc_complex(size));
+    } else if constexpr (std::is_same_v<T, float>) {
+      m_data = static_cast<T *>(fftwf_alloc_real(size));
+    } else if (std::is_same_v<T, fftwf_complex>) {
+      m_data = static_cast<T *>(fftwf_alloc_complex(size));
+    } else {
+      // Throw an exception or handle error in case of invalid type
+      throw std::invalid_argument("Unsupported type for fftw_buffer.");
+    }
+  }
+  ~fftw_buffer() {
+    if (m_data != nullptr) {
+      if constexpr (std::is_same_v<T, double> ||
+                    std::is_same_v<T, fftw_complex>) {
+        fftw_free(m_data);
+      } else if constexpr (std::is_same_v<T, float> ||
+                           std::is_same_v<T, fftwf_complex>) {
+        fftwf_free(m_data);
+      }
+    }
+  }
+
+private:
+  size_t m_size;
+  T *m_data;
+};
+
 // fftconv_plans manages the memory of the forward and backward fft plans
 // and the fftw buffers
 // Plans are for the FFTW New-Array Execute Functions
@@ -157,11 +205,13 @@ public:
     }
   }
 
-  fftconv_plans() = delete;                               // default constructor
-  fftconv_plans(fftconv_plans &&) = delete;               // move constructor
-  fftconv_plans(const fftconv_plans &) = delete;          // copy constructor
-  fftconv_plans &operator=(const fftconv_plans) = delete; // copy assignment
-  fftconv_plans &operator=(fftconv_plans &&) = delete;    // move assignment
+  fftconv_plans() = delete;                      // default constructor
+  fftconv_plans(fftconv_plans &&) = delete;      // move constructor
+  fftconv_plans(const fftconv_plans &) = delete; // copy constructor
+  auto operator=(const fftconv_plans)
+      -> fftconv_plans & = delete; // copy assignment
+  auto operator=(fftconv_plans &&)
+      -> fftconv_plans & = delete; // move assignment
 
   // Destructor
   ~fftconv_plans() {
@@ -214,44 +264,9 @@ constexpr auto fftconv_plans_cache =
 // and the fftw buffers
 // Plans are for the FFTW New-Array Execute Functions
 // https://www.fftw.org/fftw3_doc/New_002darray-Execute-Functions.html
-struct fftconv_plans_advanced {
-  // FFTW buffer sizes
-  const int real_sz;
-  const int complex_sz;
-  const int n_arrays;
+class fftconv_plans_advanced {
 
-  // FFTW buffers corresponding to the above plans
-  double *real_buf_signal;
-  fftw_complex *cx_buf_signal;
-
-  double *real_buf_kernel;
-  fftw_complex *cx_buf_kernel;
-
-  // FFTW plans
-  fftw_plan plan_forward_kernel;
-  fftw_plan plan_forward_signal;
-  fftw_plan plan_backward_signal;
-
-  // void debug_print() {
-  // #define PRINT(NAME) std::cout << #NAME << " (" << NAME << ") "
-  // PRINT(real_sz);
-  // PRINT(complex_sz);
-  // PRINT(howmany);
-  // std::cout << "\n";
-
-  // std::cout << "real_buf_kernel";
-  // print(real_buf_kernel, real_sz);
-
-  // std::cout << "cx_buf_kernel";
-  // print(cx_buf_kernel, complex_sz);
-
-  // std::cout << "real_buf_signal";
-  // print(real_buf_signal, real_sz * howmany);
-
-  // std::cout << "cx_buf_signal";
-  // print(cx_buf_signal, complex_sz * howmany);
-  //}
-
+public:
   fftconv_plans_advanced(const fftconv_plans_advanced &) = default;
   fftconv_plans_advanced(fftconv_plans_advanced &&) = delete;
   auto operator=(const fftconv_plans_advanced &)
@@ -367,6 +382,43 @@ struct fftconv_plans_advanced {
       arr[i] += real_buf_signal[pos + i] * fct;
     }
   }
+
+  // FFTW buffer sizes
+  const int real_sz;
+  const int complex_sz;
+  const int n_arrays;
+
+  // FFTW buffers corresponding to the above plans
+  double *real_buf_signal;
+  fftw_complex *cx_buf_signal;
+
+  double *real_buf_kernel;
+  fftw_complex *cx_buf_kernel;
+
+  // FFTW plans
+  fftw_plan plan_forward_kernel;
+  fftw_plan plan_forward_signal;
+  fftw_plan plan_backward_signal;
+
+  // void debug_print() {
+  // #define PRINT(NAME) std::cout << #NAME << " (" << NAME << ") "
+  // PRINT(real_sz);
+  // PRINT(complex_sz);
+  // PRINT(howmany);
+  // std::cout << "\n";
+
+  // std::cout << "real_buf_kernel";
+  // print(real_buf_kernel, real_sz);
+
+  // std::cout << "cx_buf_kernel";
+  // print(cx_buf_kernel, complex_sz);
+
+  // std::cout << "real_buf_signal";
+  // print(real_buf_signal, real_sz * howmany);
+
+  // std::cout << "cx_buf_signal";
+  // print(cx_buf_signal, complex_sz * howmany);
+  //}
 };
 
 auto fftconv_plans_advanced_cache(const size_t padded_length, const int howmany)
