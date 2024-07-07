@@ -2,12 +2,12 @@ TARGET := fftconv_test
 
 BUILD_DIR := ./build
 SRC_DIRS := ./ ./src ./src_pocketfft
-SRCS := test.cpp ./src/fftconv.cpp
+SRCS := test.cpp src/fftconv.cpp pocketfft.c
 OBJS := $(SRCS:%=$(BUILD_DIR)/%.o)
-LDFLAGS := -lfftw3 -L/opt/homebrew/lib -larmadillo 
+LDFLAGS := -lfftw3 -L/opt/homebrew/lib -larmadillo -lpthread
 
 # Every folder in ./src will need to be passed to GCC so that it can find header files
-INC_DIRS := ./ ./src
+INC_DIRS := ./ ./src ./src_pocketfft
 # Add a prefix to INC_DIRS. So moduleA would become -ImoduleA. GCC understands this -I flag
 INC_FLAGS := $(addprefix -I,$(INC_DIRS)) 
 
@@ -40,5 +40,5 @@ python:
 
 .PHONY: clean
 clean:
-	rm -r $(BUILD_DIR)
-	rm *.so
+	rm -rf $(BUILD_DIR)
+	rm -f *.so
