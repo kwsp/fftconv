@@ -210,7 +210,7 @@ vector<double> convolve1d_ref(const vector<double> &a,
 //    * Cache fftw_plan
 //    * Reuse buffers (3 fftw_mallocs vs 6 in convolve_ref)
 // https://en.wikipedia.org/w/index.php?title=Convolution#Fast_convolution_algorithms
-void convolve1d(const double *a, const size_t a_size, const double *b,
+inline void convolve1d(const double *a, const size_t a_size, const double *b,
                 const size_t b_size, double *result) {
   // length of the real arrays, including the final convolution output
   size_t padded_length = a_size + b_size - 1;
