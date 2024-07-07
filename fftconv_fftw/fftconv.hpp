@@ -11,10 +11,10 @@
 #include <memory>
 #include <mutex>
 #include <span>
+#include <type_traits>
 #include <unordered_map>
 
 #include <fftw3.h>
-#include <type_traits>
 
 namespace fftconv {
 
@@ -34,7 +34,7 @@ static std::mutex *fftconv_fftw_mutex = nullptr;
 
 // static int nextpow2(int x) { return 1 << (int)(std::log2(x) + 1); }
 // Lookup table of {max_filter_size, optimal_fft_size}
-constexpr std::array<std::array<size_t, 2>, 9> _optimal_oa_fft_size{
+constexpr std::array<std::array<size_t, 2>, 9> optimal_oa_fft_size{
     {{7, 16},
      {12, 32},
      {21, 64},
@@ -50,7 +50,7 @@ constexpr size_t max_oaconv_fft_size = 8192;
 // Given a filter_size, return the optimal fft size for the overlap-add
 // convolution method
 inline auto get_optimal_fft_size(const size_t filter_size) -> size_t {
-  for (const auto &pair : _optimal_oa_fft_size) {
+  for (const auto &pair : optimal_oa_fft_size) {
     if (filter_size < pair[0]) {
       return pair[1];
     }
@@ -72,8 +72,9 @@ template <class K, class V> auto get_cached(K key) {
 
 // In memory cache with key type K and value type V
 // additionally accepts a mutex to guard the V constructor
-template <class K, class V> auto get_cached_vlock(K key, std::mutex *V_mutex) {
-  static thread_local std::unordered_map<K, std::unique_ptr<V>> _cache;
+template <class Key, class Val>
+auto get_cached_vlock(Key key, std::mutex *V_mutex) {
+  static thread_local std::unordered_map<Key, std::unique_ptr<Val>> _cache;
 
   auto &val = _cache[key];
   if (val == nullptr) {
@@ -82,7 +83,7 @@ template <class K, class V> auto get_cached_vlock(K key, std::mutex *V_mutex) {
     const auto lock = V_mutex == nullptr ? std::unique_lock<std::mutex>{}
                                          : std::unique_lock(*V_mutex);
 
-    val = std::make_unique<V>(key);
+    val = std::make_unique<Val>(key);
   }
 
   return val.get();
@@ -306,107 +307,107 @@ template <> struct fftw_plans_1d<double> {
   fftw_plan plan_b;
 };
 
-template <FloatOrDouble> struct fftw_plans_many {};
+// template <FloatOrDouble> struct fftw_plans_many {};
 
-template <> class fftw_plans_many<float> {
-public:
-  using real_t = typename fftw_plans_traits<float>::Real;
-  using complex_t = typename fftw_plans_traits<float>::Complex;
+// template <> class fftw_plans_many<float> {
+// public:
+//   using real_t = typename fftw_plans_traits<float>::Real;
+//   using complex_t = typename fftw_plans_traits<float>::Complex;
 
-  fftw_plans_many(const fftw_plans_many &) = delete;
-  fftw_plans_many(fftw_plans_many &&) = delete;
-  auto operator=(fftw_plans_many &&) -> fftw_plans_many & = delete;
-  auto operator=(const fftw_plans_many &) -> fftw_plans_many & = delete;
+//   fftw_plans_many(const fftw_plans_many &) = delete;
+//   fftw_plans_many(fftw_plans_many &&) = delete;
+//   auto operator=(fftw_plans_many &&) -> fftw_plans_many & = delete;
+//   auto operator=(const fftw_plans_many &) -> fftw_plans_many & = delete;
 
-  fftw_plans_many(const fftw_buffer<real_t> &real,
-                  const fftw_buffer<complex_t> &complex, int n_arrays) {
-    const int real_size = static_cast<int>(real.size());
-    int rank = 1;
-    int stride = 1;
-    plan_f = fftwf_plan_many_dft_r2c(
-        rank, &real_size, n_arrays, real.data(), nullptr, stride,
-        static_cast<int>(real.size()), complex.data(), nullptr, stride,
-        static_cast<int>(complex.size()), FFTW_ESTIMATE);
+//   fftw_plans_many(const fftw_buffer<real_t> &real,
+//                   const fftw_buffer<complex_t> &complex, int n_arrays) {
+//     const int real_size = static_cast<int>(real.size());
+//     int rank = 1;
+//     int stride = 1;
+//     plan_f = fftwf_plan_many_dft_r2c(
+//         rank, &real_size, n_arrays, real.data(), nullptr, stride,
+//         static_cast<int>(real.size()), complex.data(), nullptr, stride,
+//         static_cast<int>(complex.size()), FFTW_ESTIMATE);
 
-    plan_b = fftwf_plan_many_dft_c2r(
-        rank, &real_size, n_arrays, complex.data(), nullptr, stride,
-        static_cast<int>(complex.size()), real.data(), nullptr, stride,
-        static_cast<int>(real.size()), FFTW_ESTIMATE);
-  }
+//     plan_b = fftwf_plan_many_dft_c2r(
+//         rank, &real_size, n_arrays, complex.data(), nullptr, stride,
+//         static_cast<int>(complex.size()), real.data(), nullptr, stride,
+//         static_cast<int>(real.size()), FFTW_ESTIMATE);
+//   }
 
-  ~fftw_plans_many() {
-    if (plan_f != nullptr) {
-      fftw_free(plan_f);
-    }
-    if (plan_b != nullptr) {
-      fftw_free(plan_b);
-    }
-  }
+//   ~fftw_plans_many() {
+//     if (plan_f != nullptr) {
+//       fftwf_free(plan_f);
+//     }
+//     if (plan_b != nullptr) {
+//       fftwf_free(plan_b);
+//     }
+//   }
 
-  constexpr void forward(fftw_buffer<real_t> &real,
-                         fftw_buffer<complex_t> &complex) const {
-    fftwf_execute_dft_r2c(plan_f, real.data(), complex.data());
-  }
+//   constexpr void forward(fftw_buffer<real_t> &real,
+//                          fftw_buffer<complex_t> &complex) const {
+//     fftwf_execute_dft_r2c(plan_f, real.data(), complex.data());
+//   }
 
-  constexpr void backward(fftw_buffer<complex_t> &complex,
-                          fftw_buffer<real_t> &real) const {
-    fftwf_execute_dft_c2r(plan_b, complex.data(), real.data());
-  }
+//   constexpr void backward(fftw_buffer<complex_t> &complex,
+//                           fftw_buffer<real_t> &real) const {
+//     fftwf_execute_dft_c2r(plan_b, complex.data(), real.data());
+//   }
 
-private:
-  fftwf_plan plan_f;
-  fftwf_plan plan_b;
-};
+// private:
+//   fftwf_plan plan_f;
+//   fftwf_plan plan_b;
+// };
 
-template <> class fftw_plans_many<double> {
-public:
-  using real_t = typename fftw_plans_traits<double>::Real;
-  using complex_t = typename fftw_plans_traits<double>::Complex;
+// template <> class fftw_plans_many<double> {
+// public:
+//   using real_t = typename fftw_plans_traits<double>::Real;
+//   using complex_t = typename fftw_plans_traits<double>::Complex;
 
-  fftw_plans_many(const fftw_plans_many &) = delete;
-  fftw_plans_many(fftw_plans_many &&) = delete;
-  auto operator=(fftw_plans_many &&) -> fftw_plans_many & = delete;
-  auto operator=(const fftw_plans_many &) -> fftw_plans_many & = delete;
+//   fftw_plans_many(const fftw_plans_many &) = delete;
+//   fftw_plans_many(fftw_plans_many &&) = delete;
+//   auto operator=(fftw_plans_many &&) -> fftw_plans_many & = delete;
+//   auto operator=(const fftw_plans_many &) -> fftw_plans_many & = delete;
 
-  fftw_plans_many(const fftw_buffer<real_t> &real,
-                  const fftw_buffer<complex_t> &complex, int n_arrays) {
-    const int real_size = static_cast<int>(real.size());
-    int rank = 1;
-    int stride = 1;
-    plan_f = fftw_plan_many_dft_r2c(
-        rank, &real_size, n_arrays, real.data(), nullptr, stride,
-        static_cast<int>(real.size()), complex.data(), nullptr, stride,
-        static_cast<int>(complex.size()), FFTW_ESTIMATE);
+//   fftw_plans_many(const fftw_buffer<real_t> &real,
+//                   const fftw_buffer<complex_t> &complex, int n_arrays) {
+//     const int real_size = static_cast<int>(real.size());
+//     int rank = 1;
+//     int stride = 1;
+//     plan_f = fftw_plan_many_dft_r2c(
+//         rank, &real_size, n_arrays, real.data(), nullptr, stride,
+//         static_cast<int>(real.size()), complex.data(), nullptr, stride,
+//         static_cast<int>(complex.size()), FFTW_ESTIMATE);
 
-    plan_b = fftw_plan_many_dft_c2r(
-        rank, &real_size, n_arrays, complex.data(), nullptr, stride,
-        static_cast<int>(complex.size()), real.data(), nullptr, stride,
-        static_cast<int>(real.size()), FFTW_ESTIMATE);
-  }
+//     plan_b = fftw_plan_many_dft_c2r(
+//         rank, &real_size, n_arrays, complex.data(), nullptr, stride,
+//         static_cast<int>(complex.size()), real.data(), nullptr, stride,
+//         static_cast<int>(real.size()), FFTW_ESTIMATE);
+//   }
 
-  ~fftw_plans_many() {
-    if (plan_f != nullptr) {
-      fftw_free(plan_f);
-    }
-    if (plan_b != nullptr) {
-      fftw_free(plan_b);
-    }
-  }
+//   ~fftw_plans_many() {
+//     if (plan_f != nullptr) {
+//       fftw_free(plan_f);
+//     }
+//     if (plan_b != nullptr) {
+//       fftw_free(plan_b);
+//     }
+//   }
 
-  constexpr void forward(fftw_buffer<real_t> &real,
-                         fftw_buffer<complex_t> &complex) const {
-    fftw_execute_dft_r2c(plan_f, real.data(), complex.data());
-  }
+//   constexpr void forward(fftw_buffer<real_t> &real,
+//                          fftw_buffer<complex_t> &complex) const {
+//     fftw_execute_dft_r2c(plan_f, real.data(), complex.data());
+//   }
 
-  constexpr void backward(fftw_buffer<complex_t> &complex,
-                          fftw_buffer<real_t> &real) const {
-    fftw_execute_dft_c2r(plan_b, complex.data(), real.data());
-  }
+//   constexpr void backward(fftw_buffer<complex_t> &complex,
+//                           fftw_buffer<real_t> &real) const {
+//     fftw_execute_dft_c2r(plan_b, complex.data(), real.data());
+//   }
 
-private:
-  fftw_plan plan_f;
-  fftw_plan plan_b;
-};
+// private:
+//   fftw_plan plan_f;
+//   fftw_plan plan_b;
+// };
 } // namespace internal
 
 // Since FFTW planners are not thread-safe, you can pass a pointer to a
@@ -525,103 +526,108 @@ private:
   internal::fftw_plans_1d<Real> plans;
 };
 
-// fftconv_plans manages the memory of the forward and backward fft plans
-// and the fftw buffers
-// Plans are for the FFTW New-Array Execute Functions
-// https://www.fftw.org/fftw3_doc/New_002darray-Execute-Functions.html
-template <FloatOrDouble Real> class fftconv_plans_advanced {
-  using Complex = internal::fftw_plans_traits<Real>::Complex;
+// struct fftconv_plans_advanced_cache_key {
+//   size_t padded_length;
+//   size_t n_arrays;
+//   auto operator==(const fftconv_plans_advanced_cache_key &other) const
+//       -> bool = default;
+// };
 
-public:
-  static auto get(const size_t padded_length, const int n_arrays)
-      -> fftconv_plans_advanced<Real> & {
-    static thread_local std::unordered_map<
-        size_t, std::unique_ptr<fftconv_plans_advanced<Real>>>
-        _cache;
-    const size_t _hash = (padded_length << 4) ^ n_arrays;
+// // fftconv_plans manages the memory of the forward and backward fft plans
+// // and the fftw buffers
+// // Plans are for the FFTW New-Array Execute Functions
+// // https://www.fftw.org/fftw3_doc/New_002darray-Execute-Functions.html
+// template <FloatOrDouble Real> class fftconv_plans_advanced {
+//   using Complex = internal::fftw_plans_traits<Real>::Complex;
 
-    auto &plan = _cache[_hash];
-    if (plan == nullptr || plan->kernel_real.size() != padded_length) {
-      plan = std::make_unique<fftconv_plans_advanced<Real>>(padded_length,
-                                                            n_arrays);
-    }
-    return *plan;
-  }
+// public:
+//   static auto get(const fftconv_plans_advanced_cache_key &key) -> auto & {
+//     thread_local static auto cache =
+//         internal::get_cached_vlock<fftconv_plans_advanced_cache_key,
+//                                    fftconv_plans_advanced<Real>>;
+//     return *cache(key, get_fftw_mutex());
+//   }
 
-  // Use advanced interface
-  explicit fftconv_plans_advanced(const size_t padded_length,
-                                  const size_t n_arrays = 1)
-      : n_arrays(n_arrays), kernel_real(padded_length),
-        kernel_cx(padded_length / 2 + 1), signal_real(padded_length * n_arrays),
-        signal_cx(padded_length * n_arrays),
-        plan_kernel(kernel_real, kernel_cx),
-        plan_signal(signal_real, signal_cx, n_arrays) {
-    // `howmany` is the (nonnegative) number of transforms to compute.
-    // - The resulting plan computs `howmany` transforms, where the input of
-    //   the k-th transform is at location `in+k*idist`
-    // - Each of `howmany` has rank `rank` and size `n`
-  }
+//   fftconv_plans_advanced(const fftconv_plans_advanced_cache_key &key)
+//       : fftconv_plans_advanced(key.padded_length, key.n_arrays) {}
 
-  void oaconvolve(const std::span<const Real> arr,
-                  const std::span<const Real> kernel, std::span<Real> res) {
+//   // Use advanced interface
+//   explicit fftconv_plans_advanced(const size_t padded_length,
+//                                   const size_t n_arrays = 1)
+//       : n_arrays(n_arrays), kernel_real(padded_length),
+//         kernel_cx(padded_length / 2 + 1), signal_real(padded_length *
+//         n_arrays), signal_cx(padded_length * n_arrays),
+//         plan_kernel(kernel_real, kernel_cx),
+//         plan_signal(signal_real, signal_cx, n_arrays) {
+//     // `howmany` is the (nonnegative) number of transforms to compute.
+//     // - The resulting plan computs `howmany` transforms, where the input of
+//     //   the k-th transform is at location `in+k*idist`
+//     // - Each of `howmany` has rank `rank` and size `n`
+//   }
 
-    auto kernel_real_span = kernel_real.span();
-    auto signal_real_span = signal_real.span();
+//   void oaconvolve(const std::span<const Real> arr,
+//                   const std::span<const Real> kernel, std::span<Real> res) {
 
-    // Forward kernel
-    internal::copy_to_padded_buffer(kernel, kernel_real_span);
-    plan_kernel.forward(kernel_real, kernel_cx);
+//     auto kernel_real_span = kernel_real.span();
+//     auto signal_real_span = signal_real.span();
 
-    // Forward signal
-    const auto fft_size = kernel_real.size();
-    const auto step_size = fft_size - (kernel.size() - 1);
-    for (size_t pos = 0, idx = 0; pos < arr.size(); pos += step_size, idx++) {
-      size_t len = std::min<size_t>(arr.size() - pos, step_size); // bound check
-      internal::copy_to_padded_buffer(arr.subspan(pos, len), signal_real_span);
-    }
-    plan_signal.forward(signal_real, signal_cx);
+//     // Forward kernel
+//     internal::copy_to_padded_buffer(kernel, kernel_real_span);
+//     plan_kernel.forward(kernel_real, kernel_cx);
 
-    // Complex multiply
-    auto signal_cx_span = signal_cx.span();
-    auto kernel_cx_span = kernel_cx.cspan();
-    for (int i = 0; i < n_arrays; ++i) {
-      auto signal_cx_subspan = signal_cx_span.subspan(i * kernel_cx.size());
-      internal::elementwise_multiply(
-          std::span<const Complex>(signal_cx_subspan), kernel_cx_span,
-          signal_cx_subspan);
-    }
+//     // Forward signal
+//     const auto fft_size = kernel_real.size();
+//     const auto step_size = fft_size - (kernel.size() - 1);
+//     for (size_t pos = 0, idx = 0; pos < arr.size(); pos += step_size, idx++)
+//     {
+//       size_t len = std::min<size_t>(arr.size() - pos, step_size); // bound
+//       check internal::copy_to_padded_buffer(arr.subspan(pos, len),
+//       signal_real_span);
+//     }
+//     plan_signal.forward(signal_real, signal_cx);
 
-    // Backward
-    plan_signal.backward(signal_cx, signal_real);
+//     // Complex multiply
+//     auto signal_cx_span = signal_cx.span();
+//     auto kernel_cx_span = kernel_cx.cspan();
+//     for (int i = 0; i < n_arrays; ++i) {
+//       auto signal_cx_subspan = signal_cx_span.subspan(i * kernel_cx.size());
+//       internal::elementwise_multiply(
+//           std::span<const Complex>(signal_cx_subspan), kernel_cx_span,
+//           signal_cx_subspan);
+//     }
 
-    // Copy results
-    const double fct = 1. / kernel_real.size();
-    for (size_t pos = 0, idx = 0; pos < res.size(); pos += step_size, idx++) {
-      size_t len = std::min<size_t>(res.size() - pos, fft_size); // bound check
-      auto res_subspan = res.subspan(pos, len);
+//     // Backward
+//     plan_signal.backward(signal_cx, signal_real);
 
-      const auto size2 = std::min<size_t>(kernel_real.size(), len);
-      const size_t pos2 = idx * kernel_real.size();
-      for (int i = 0; i < size2; ++i) {
-        res_subspan[i] += signal_real[pos + i] * fct;
-      }
-    }
-  }
+//     // Copy results
+//     const double fct = 1. / kernel_real.size();
+//     for (size_t pos = 0, idx = 0; pos < res.size(); pos += step_size, idx++)
+//     {
+//       size_t len = std::min<size_t>(res.size() - pos, fft_size); // bound
+//       check auto res_subspan = res.subspan(pos, len);
 
-private:
-  // FFTW buffer sizes
-  size_t n_arrays;
+//       const auto size2 = std::min<size_t>(kernel_real.size(), len);
+//       const size_t pos2 = idx * kernel_real.size();
+//       for (int i = 0; i < size2; ++i) {
+//         res_subspan[i] += signal_real[pos + i] * fct;
+//       }
+//     }
+//   }
 
-  // FFTW padded buffers
-  internal::fftw_buffer<Real> signal_real;
-  internal::fftw_buffer<Complex> signal_cx;
-  internal::fftw_buffer<Real> kernel_real;
-  internal::fftw_buffer<Complex> kernel_cx;
+// private:
+//   // FFTW buffer sizes
+//   size_t n_arrays;
 
-  // FFTW plans
-  internal::fftw_plans_1d<Real> plan_kernel;
-  internal::fftw_plans_many<Real> plan_signal;
-};
+//   // FFTW padded buffers
+//   internal::fftw_buffer<Real> signal_real;
+//   internal::fftw_buffer<Complex> signal_cx;
+//   internal::fftw_buffer<Real> kernel_real;
+//   internal::fftw_buffer<Complex> kernel_cx;
+
+//   // FFTW plans
+//   internal::fftw_plans_1d<Real> plan_kernel;
+//   internal::fftw_plans_many<Real> plan_signal;
+// };
 
 // 1D convolution using the FFT
 // Optimizations:
@@ -728,17 +734,33 @@ void convolve_fftw_ref(const std::span<const double> arr1,
   fftw_destroy_plan(plan_backward);
 }
 
-template <FloatOrDouble Real>
-void oaconvolve_fftw_advanced(const std::span<const Real> arr,
-                              const std::span<const Real> kernel,
-                              std::span<Real> res) {
-  // more optimal size for each fft
-  const auto fft_size = internal::get_optimal_fft_size(kernel.size());
-  const auto step_size = fft_size - (kernel.size() - 1);
-  const auto n_arrays = arr.size() / step_size + 1; // last batch zero pad
+// template <FloatOrDouble Real>
+// void oaconvolve_fftw_advanced(const std::span<const Real> arr,
+//                               const std::span<const Real> kernel,
+//                               std::span<Real> res) {
+//   // more optimal size for each fft
+//   const auto fft_size = internal::get_optimal_fft_size(kernel.size());
+//   const auto step_size = fft_size - (kernel.size() - 1);
+//   const auto n_arrays = arr.size() / step_size + 1; // last batch zero pad
 
-  auto &plans = fftconv_plans_advanced<Real>::get(fft_size, n_arrays);
-  plans.oaconvolve(arr, kernel, res);
-}
+//   auto &plans = fftconv_plans_advanced<Real>::get({fft_size, n_arrays});
+//   plans.oaconvolve(arr, kernel, res);
+// }
 
 } // namespace fftconv
+
+// template <> struct std::hash<fftconv::fftconv_plans_advanced_cache_key> {
+//   auto operator()(const fftconv::fftconv_plans_advanced_cache_key &key)
+//       const noexcept -> size_t {
+//     size_t seed = 0;
+//     std::hash<size_t> hasher;
+//     // Combine hashes like boost::has_combine
+//     // May not be great and needs more testing
+//     // NOLINTBEGIN(*-magic-numbers)
+//     seed ^= hasher(key.padded_length) + 0x9e3779b9 + (seed << 6) + (seed >>
+//     2); seed ^= hasher(key.n_arrays) + 0x9e3779b9 + (seed << 6) + (seed >>
+//     2);
+//     // NOLINTEND(*-magic-numbers)
+//     return seed;
+//   }
+// };

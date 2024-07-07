@@ -1,10 +1,8 @@
 #include <array>
 #include <cstdlib>
 #include <cstring>
-#include <functional>
 #include <iostream>
 #include <span>
-#include <string>
 
 #include <armadillo>
 
@@ -14,48 +12,34 @@
 
 constexpr int N_RUNS = 5000;
 
-void arma_conv(const arma::vec &vec1, const arma::vec &vec2) {
-  volatile auto tmp = arma::conv(vec1, vec2);
-}
+template <fftconv::FloatOrDouble T>
+void bench(const arma::Col<T> &vec1, const arma::Col<T> &vec2) {
+  arma::Col<T> _res(vec1.size() + vec2.size() - 1);
 
-void bench(const arma::vec &vec1, const arma::vec &vec2) {
-  arma::vec res(vec1.size() + vec2.size() - 1);
+  const std::span v1s(vec1);
+  const std::span v2s(vec2);
+  const std::span res(_res);
 
   timeit(
-      "convolve_fftw_ref",
-      [&]() {
-        fftconv::convolve_fftw_ref(std::span(vec1), std::span(vec2),
-                                   std::span(res));
-      },
+      "convolve_fftw_ref", [&]() { fftconv::convolve_fftw_ref(v1s, v2s, res); },
       N_RUNS);
 
   timeit(
-      "convolve_fftw",
-      [&]() {
-        fftconv::convolve_fftw(std::span(vec1), std::span(vec2),
-                               std::span(res));
-      },
+      "convolve_fftw", [&]() { fftconv::convolve_fftw(v1s, v2s, res); },
       N_RUNS);
 
   timeit(
-      "oaconvolve_fftw",
-      [&]() {
-        fftconv::oaconvolve_fftw(std::span(vec1), std::span(vec2),
-                                 std::span(res));
-      },
+      "oaconvolve_fftw", [&]() { fftconv::oaconvolve_fftw(v1s, v2s, res); },
       N_RUNS);
 
-  // TIMEIT(convolve_fftw_advanced, vec1, vec2);
-  // TIMEIT(oaconvolve_fftw, vec1, vec2);
-  // TIMEIT(oaconvolve_fftw_advanced, vec1, vec2);
+  // timeit(
+  //     "oaconvolve_fftw_advanced",
+  //     [&]() { fftconv::oaconvolve_fftw_advanced(v1s, v2s, res); }, N_RUNS);
 
   // TIMEIT(convolve_pocketfft, vec1, vec2);
   // TIMEIT(oaconvolve_pocketfft, vec1, vec2);
   // TIMEIT(convolve_pocketfft_hdr, vec1, vec2);
   // TIMEIT(oaconvolve_pocketfft_hdr, vec1, vec2);
-
-  timeit(
-      "arma::conv", [&]() { arma_conv(vec1, vec2); }, N_RUNS);
 }
 
 auto main() -> int {
