@@ -3,8 +3,8 @@
 #include <functional>
 #include <vector>
 
-#include "fftconv.h"
-#include "fftconv_pocket.h"
+#include "fftconv.hpp"
+#include "fftconv_pocket.hpp"
 #include <armadillo>
 
 using std::vector;
@@ -65,13 +65,13 @@ void convolve_armadillo(vector<double> &a, vector<double> &b) {
 
 using namespace fftconv;
 
-REGISTER(convolve_naive)
-REGISTER(convolve_fftw)
+//REGISTER(convolve_naive)
+//REGISTER(convolve_fftw)
 REGISTER(oaconvolve_fftw)
-REGISTER(convolve_pocketfft)
+//REGISTER(convolve_pocketfft)
 REGISTER(oaconvolve_pocketfft)
-REGISTER(convolve_pocketfft_hdr)
+//REGISTER(convolve_pocketfft_hdr)
 REGISTER(oaconvolve_pocketfft_hdr)
-REGISTER(convolve_armadillo)
+//REGISTER(convolve_armadillo)
 
 BENCHMARK_MAIN();
