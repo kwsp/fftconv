@@ -98,10 +98,16 @@ def parse_txt_result(path: Path):
     return date, pd.DataFrame(bms)
 
 
-date, df = parse_txt_result(Path("./bench_results_20240706_m1.txt"))
+date, df = parse_txt_result(Path("./bench_results/bench_results_20240706_m1.txt"))
 
 # %%
-df
+date2, df2 = parse_txt_result(Path("./bench_results/bench_results_20240706_m1_v2.txt"))
+
+# %%
+print("Pct improvement")
+df["diff"] = df.cpu_time_ns - df2.cpu_time_ns
+df["pct_change"] = df["diff"] / df.cpu_time_ns
+df.groupby("func_name")["pct_change"].mean()
 
 # %%
 df = df[df.func_name.str.startswith(("BM_oaconvolve", "BM_arma_conv"))]
