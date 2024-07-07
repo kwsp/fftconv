@@ -117,8 +117,8 @@ template <class T>
 void _copy_to_padded_buffer(const T *src, const size_t src_size, T *dst,
                             const size_t dst_size) {
   assert(src_size <= dst_size);
-  memcpy(dst, src, sizeof(T) * src_size);
-  memset(&dst[src_size], 0, sizeof(T) * (dst_size - src_size));
+  std::copy(src, src + src_size, dst);
+  std::fill(dst + src_size, dst + dst_size, 0);
 }
 
 // http://en.wikipedia.org/w/index.php?title=Convolution&oldid=630841165#Fast_convolution_algorithms
