@@ -77,6 +77,6 @@ for ax, param2 in zip(axes.flatten(), param2unique):
 fig.legend(h, labels, loc="upper right")
 fig.suptitle("Overlap-Add Convolution (C++)")
 # fig.tight_layout()
-# plt.savefig(f"bench_{date}.svg")
+plt.savefig(f"bench_{date}.svg")
 
 # %%
