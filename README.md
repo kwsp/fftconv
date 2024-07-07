@@ -35,43 +35,37 @@ python3 test.py                 # run the test/benchmark
 
 ## Benchmark results
 
-CPU: Apple M1
+CPU: Intel i7 Comet Lake
 
 **C++**.
 
 ```
 % make test
 ./build/fftconv_test
-=== test case (8, 4) ===
-gt vs fftconv Vectors are equal.
-gt vs fftconv_oa Vectors are equal.
-    (5000 runs) fftconv::fftconv took 0ms
-    (5000 runs) fftconv::fftconv_oa took 0ms
-    (5000 runs) arma_conv took 0ms
 === test case (1664, 65) ===
 gt vs fftconv Vectors are equal.
 gt vs fftconv_oa Vectors are equal.
-    (5000 runs) fftconv::fftconv took 55ms
+    (5000 runs) fftconv::fftconv took 85ms
     (5000 runs) fftconv::fftconv_oa took 36ms
-    (5000 runs) arma_conv took 109ms
+    (5000 runs) arma_conv took 106ms
 === test case (2816, 65) ===
 gt vs fftconv Vectors are equal.
 gt vs fftconv_oa Vectors are equal.
-    (5000 runs) fftconv::fftconv took 103ms
-    (5000 runs) fftconv::fftconv_oa took 62ms
-    (5000 runs) arma_conv took 183ms
+    (5000 runs) fftconv::fftconv took 112ms
+    (5000 runs) fftconv::fftconv_oa took 60ms
+    (5000 runs) arma_conv took 172ms
 === test case (2304, 65) ===
 gt vs fftconv Vectors are equal.
 gt vs fftconv_oa Vectors are equal.
-    (5000 runs) fftconv::fftconv took 264ms
-    (5000 runs) fftconv::fftconv_oa took 52ms
-    (5000 runs) arma_conv took 150ms
+    (5000 runs) fftconv::fftconv took 523ms
+    (5000 runs) fftconv::fftconv_oa took 51ms
+    (5000 runs) arma_conv took 144ms
 === test case (4352, 65) ===
 gt vs fftconv Vectors are equal.
 gt vs fftconv_oa Vectors are equal.
-    (5000 runs) fftconv::fftconv took 315ms
+    (5000 runs) fftconv::fftconv took 330ms
     (5000 runs) fftconv::fftconv_oa took 86ms
-    (5000 runs) arma_conv took 284ms
+    (5000 runs) arma_conv took 267ms
 ```
 
 **Python**.
@@ -80,32 +74,36 @@ gt vs fftconv_oa Vectors are equal.
 % python3 test.py
 === test case (1664, 65) ===
 Vectors are equal.
-    (5000 runs) fftconv took 65ms
-    (5000 runs) fftconv_oa took 43ms
-    (5000 runs) np.convolve took 141ms
-    (5000 runs) scipy.signal.convolve took 159ms
-    (5000 runs) scipy.signal.fftconvolve took 194ms
+    (5000 runs) fftconv took 72ms
+    (5000 runs) fftconv_oa took 49ms
+    (5000 runs) np.convolve took 105ms
+    (5000 runs) scipy.signal.convolve took 139ms
+    (5000 runs) scipy.signal.fftconvolve took 351ms
+    (5000 runs) scipy.signal.oaconvolve took 718ms
 === test case (2816, 65) ===
 Vectors are equal.
-    (5000 runs) fftconv took 95ms
-    (5000 runs) fftconv_oa took 67ms
-    (5000 runs) np.convolve took 233ms
-    (5000 runs) scipy.signal.convolve took 251ms
-    (5000 runs) scipy.signal.fftconvolve took 254ms
+    (5000 runs) fftconv took 126ms
+    (5000 runs) fftconv_oa took 72ms
+    (5000 runs) np.convolve took 162ms
+    (5000 runs) scipy.signal.convolve took 197ms
+    (5000 runs) scipy.signal.fftconvolve took 429ms
+    (5000 runs) scipy.signal.oaconvolve took 762ms
 === test case (2304, 65) ===
 Vectors are equal.
-    (5000 runs) fftconv took 278ms
-    (5000 runs) fftconv_oa took 59ms
-    (5000 runs) np.convolve took 195ms
-    (5000 runs) scipy.signal.convolve took 213ms
-    (5000 runs) scipy.signal.fftconvolve took 240ms
+    (5000 runs) fftconv took 553ms
+    (5000 runs) fftconv_oa took 66ms
+    (5000 runs) np.convolve took 138ms
+    (5000 runs) scipy.signal.convolve took 174ms
+    (5000 runs) scipy.signal.fftconvolve took 407ms
+    (5000 runs) scipy.signal.oaconvolve took 757ms
 === test case (4352, 65) ===
 Vectors are equal.
-    (5000 runs) fftconv took 329ms
-    (5000 runs) fftconv_oa took 94ms
-    (5000 runs) np.convolve took 372ms
-    (5000 runs) scipy.signal.convolve took 375ms
-    (5000 runs) scipy.signal.fftconvolve took 358ms
+    (5000 runs) fftconv took 355ms
+    (5000 runs) fftconv_oa took 100ms
+    (5000 runs) np.convolve took 251ms
+    (5000 runs) scipy.signal.convolve took 285ms
+    (5000 runs) scipy.signal.fftconvolve took 602ms
+    (5000 runs) scipy.signal.oaconvolve took 833ms
 ```
 
 The Python wrapper is almost as fast as the C++ code, as it has very little overhead.
