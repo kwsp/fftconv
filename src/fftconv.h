@@ -1,5 +1,6 @@
 // Author: Tiger Nie
 // 2022
+// https://github.com/kwsp/fftconv
 
 #ifndef __FFTCONV_H__
 #define __FFTCONV_H__
@@ -24,8 +25,8 @@
 
 // armadillo wrapper for fftconv routines
 #ifdef ARMA_INCLUDES
-  #define ARMA_WRAPPER(CONV_FUNC) \
-  inline arma::vec CONV_FUNC(const arma::vec &x, const arma::vec &b) { \
+#define ARMA_WRAPPER(CONV_FUNC)                                                \
+  inline arma::vec CONV_FUNC(const arma::vec &x, const arma::vec &b) {         \
     arma::vec y(b.size() + x.size() - 1);                                      \
     CONV_FUNC(x.memptr(), x.size(), b.memptr(), b.size(), y.memptr(),          \
               y.size());                                                       \
@@ -40,15 +41,15 @@ namespace fftconv {
 //    * Cache fftw_plan
 //    * Reuse buffers (no malloc on second call to the same convolution size)
 // https://en.wikipedia.org/w/index.php?title=Convolution#Fast_convolution_algorithms
-void fftconv(const double *a, const size_t a_size, const double *b,
-             const size_t b_size, double *y, const size_t y_sz);
+void fftconv(const double *a, const size_t a_sz, const double *b,
+             const size_t b_sz, double *y, const size_t y_sz);
 
 // Reference implementation of fft convolution with minimal optimizations
-void fftconv_ref(const double *a, const size_t a_size, const double *b,
-                 const size_t b_size, double *y, const size_t y_sz);
+void fftconv_ref(const double *a, const size_t a_sz, const double *b,
+                 const size_t b_sz, double *y, const size_t y_sz);
 
 // FFTconv with overlap-add method
-void fftconv_oa(const double *x, const size_t x_size, const double *h,
+void fftconv_oa(const double *x, const size_t x_sz, const double *h,
                 const size_t h_sz, double *y, const size_t y_sz);
 
 // std::vector interface to the fftconv routines
@@ -58,9 +59,9 @@ VECTOR_WRAPPER(fftconv_oa)
 
 // arma::vec interface
 #ifdef ARMA_WRAPPER
- ARMA_WRAPPER(fftconv)
- ARMA_WRAPPER(fftconv_ref)
- ARMA_WRAPPER(fftconv_oa)
+ARMA_WRAPPER(fftconv)
+ARMA_WRAPPER(fftconv_ref)
+ARMA_WRAPPER(fftconv_oa)
 #endif
 
 // In memory cache with key type K and value type V
