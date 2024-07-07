@@ -4,8 +4,6 @@
 #include "fftconv.h"
 #include <algorithm>
 #include <array>
-#include <memory>
-#include <unordered_map>
 
 // static int nextpow2(int x) { return 1 << (int)(std::log2(x) + 1); }
 
@@ -169,41 +167,19 @@ fftconv_plans::fftconv_plans(size_t padded_length)
       plan_b(fftw_plan_dft_c2r_1d(padded_length, complex_buf_a, real_buf,
                                   FFTW_ESTIMATE)) {}
 
-// In memory cache with key type K and value type V
-// V's constructor must take K as input
-template <class K, class V> class Cache {
-public:
-  // Get a cached object if available.
-  // Otherwise, a new one will be constructed.
-  V *get(K key) {
-    auto &val = _cache[key];
-    if (val)
-      return val.get();
-
-    val = std::make_unique<V>(key);
-    return val.get();
-  }
-
-  V *operator()(K key) { return get(key); }
-
-private:
-  // hash map cache to store fftw plans and buffers.
-  std::unordered_map<K, std::unique_ptr<V>> _cache;
-};
+namespace fftconv {
 
 // static thread_local Cache<size_t, fft_plan> fft_plan_cache;
 static thread_local Cache<size_t, fftconv_plans> fftconv_plans_cache;
 
-namespace fftconv {
-
-void convolve1d(const double *a, const size_t a_size, const double *b,
-                const size_t b_size, double *result) {
+void fftconv(const double *a, const size_t a_sz, const double *b,
+             const size_t b_sz, double *result, const size_t res_sz) {
   // length of the real arrays, including the final convolution output
-  size_t padded_length = a_size + b_size - 1;
+  const size_t padded_length = a_sz + b_sz - 1;
 
   // Get cached plans
   fftconv_plans *plan = fftconv_plans_cache(padded_length);
-  plan->execute_conv(a, a_size, b, b_size);
+  plan->execute_conv(a, a_sz, b, b_sz);
 
   // copy normalized to result
   const auto real_buf = plan->get_real_buf();
@@ -212,12 +188,12 @@ void convolve1d(const double *a, const size_t a_size, const double *b,
   }
 }
 
-void convolve1d_ref(const double *a, const size_t a_size, const double *b,
-                    const size_t b_size, double *result) {
+void fftconv_ref(const double *a, const size_t a_sz, const double *b,
+                 const size_t b_sz, double *result, const size_t result_sz) {
   // length of the real arrays, including the final convolution output
-  size_t padded_length = a_size + b_size - 1;
+  const size_t padded_length = a_sz + b_sz - 1;
   // length of the complex arrays
-  size_t complex_length = padded_length / 2 + 1;
+  const size_t complex_length = padded_length / 2 + 1;
 
   // Allocate fftw buffers for a
   double *a_buf = fftw_alloc_real(padded_length);
@@ -228,7 +204,7 @@ void convolve1d_ref(const double *a, const size_t a_size, const double *b,
       fftw_plan_dft_r2c_1d(padded_length, a_buf, A_buf, FFTW_ESTIMATE);
 
   // Copy a to buffer
-  _copy_to_padded_buffer(a, a_size, a_buf, padded_length);
+  _copy_to_padded_buffer(a, a_sz, a_buf, padded_length);
 
   // Compute Fourier transform of vector a
   fftw_execute_dft_r2c(plan_forward, a_buf, A_buf);
@@ -238,7 +214,7 @@ void convolve1d_ref(const double *a, const size_t a_size, const double *b,
   fftw_complex *B_buf = fftw_alloc_complex(complex_length);
 
   // Copy b to buffer
-  _copy_to_padded_buffer(b, b_size, b_buf, padded_length);
+  _copy_to_padded_buffer(b, b_sz, b_buf, padded_length);
 
   // Compute Fourier transform of vector b
   fftw_execute_dft_r2c(plan_forward, b_buf, B_buf);
@@ -271,14 +247,6 @@ void convolve1d_ref(const double *a, const size_t a_size, const double *b,
   fftw_destroy_plan(plan_backward);
 }
 
-std::vector<double> convolve1d_ref(const std::vector<double> &a,
-                                   const std::vector<double> &b) {
-  int padded_length = a.size() + b.size() - 1;
-  std::vector<double> result(padded_length);
-  convolve1d_ref(a.data(), a.size(), b.data(), b.size(), result.data());
-  return result;
-}
-
 // Overlap-Add convolution of x and h with block length B
 //
 // x is a long signal
@@ -291,23 +259,22 @@ std::vector<double> convolve1d_ref(const std::vector<double> &a,
 // 2. convolve with kernel b. The size of the convolution should be
 //    (B + y_size - 1)
 // 3. add blocks together
-void fftfilt(const double *x, const size_t x_size, const double *h,
-             const size_t h_size, double *y, const size_t y_size) {
+void fftconv_oa(const double *x, const size_t x_sz, const double *h,
+                const size_t h_sz, double *y, const size_t y_sz) {
 
   // const size_t N = 8 * nextpow2(h_size); // size for each fft
-  const size_t N =
-      get_optimal_fft_size(h_size); // more optimal size for each fft
-  const size_t step_size = N - (h_size - 1);
+  const size_t N = get_optimal_fft_size(h_sz); // more optimal size for each fft
+  const size_t step_size = N - (h_sz - 1);
 
   // forward fft of b
   auto plan = fftconv_plans_cache(N);
-  plan->set_real_buf(h, h_size);
+  plan->set_real_buf(h, h_sz);
   plan->forward_b();
 
   // create forward/backward ffts for x
   auto real_buf = plan->get_real_buf();
-  for (size_t pos = 0; pos < x_size; pos += step_size) {
-    size_t len = std::min(x_size - pos, step_size); // bound check
+  for (size_t pos = 0; pos < x_sz; pos += step_size) {
+    size_t len = std::min(x_sz - pos, step_size); // bound check
     plan->set_real_buf(x + pos, len);
     plan->forward_a();
     plan->complex_multiply_to_a();
@@ -315,19 +282,10 @@ void fftfilt(const double *x, const size_t x_size, const double *h,
     // plan->normalize(); // either normalize here or later in the copy loop
 
     // normalize output and add to result
-    len = std::min(y_size - pos, N);
+    len = std::min(y_sz - pos, N);
     for (size_t i = 0; i < len; ++i)
       y[pos + i] += real_buf[i] / N;
   }
-}
-
-std::vector<double> fftfilt(const std::vector<double> &x,
-                            const std::vector<double> &b) {
-  // Use overlap and add to convolve x and b
-  const size_t y_size = b.size() + x.size() - 1;
-  std::vector<double> y(y_size);
-  fftfilt(x.data(), x.size(), b.data(), b.size(), y.data(), y_size);
-  return y;
 }
 
 } // namespace fftconv

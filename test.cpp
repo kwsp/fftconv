@@ -6,6 +6,7 @@
 #include <functional>
 #include <iostream>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "fftconv.h"
@@ -38,7 +39,7 @@ vector<double> convolve_naive(const vector<double> &a,
 }
 
 // Run the `callable` `n_runs` times and print the time.
-void timeit(string name, std::function<void()> callable, int n_runs = N_RUNS) {
+void _timeit(std::string_view name, std::function<void()> callable, int n_runs = N_RUNS) {
   using namespace std::chrono;
   cout << "    (" << n_runs << " runs) " << name;
   auto start = high_resolution_clock::now();
@@ -48,6 +49,9 @@ void timeit(string name, std::function<void()> callable, int n_runs = N_RUNS) {
       duration_cast<milliseconds>(high_resolution_clock::now() - start);
   cout << " took " << elapsed.count() << "ms\n";
 }
+
+#define TIMEIT(FUNC, V1, V2) \
+_timeit(#FUNC, [&]() { return FUNC(V1, V2); }, N_RUNS);
 
 // Compare two vectors
 template <class T>
@@ -98,52 +102,39 @@ template <class T> void print_vec(std::vector<T> vec) {
 
 void print_vec(arma::vec vec) { print_vec(vec.memptr(), vec.size()); }
 
+void _test(const vector<double> &a, const vector<double> &b) {
+  // Ground true
+  auto gt = convolve_naive(a, b);
+  auto cmp = [&](std::string_view name, vector<double> &res) {
+    cout << "gt vs " << name << " ";
+    if (!cmp_vec(gt, res)) {
+      cout << "ground truth: ";
+      print_vec(gt);
+      cout << name << ":";
+      print_vec(res);
+    }
+  };
+
+  auto res_fftconv = fftconv::fftconv(a, b);
+  cmp("fftconv", res_fftconv);
+  auto res_oa = fftconv::fftconv_oa(a, b);
+  cmp("fftconv_oa", res_oa);
+}
+
 // Run a test case
 void test_a_case(vector<double> a, vector<double> b) {
   using namespace std::chrono;
   printf("=== test case (%lu, %lu) ===\n", a.size(), b.size());
-
-  // Ground true
-  auto result_naive = convolve_naive(a, b);
-
-  //auto result_fft_ref = fftconv::convolve1d_ref(a, b);
-  //cout << "naive vs fft_ref ";
-  //if (!cmp_vec(result_naive, result_fft_ref)) {
-    //cout << "naive   : ";
-    //print_vec(result_naive);
-    //cout << "fft_ref : ";
-    //print_vec(result_fft_ref);
-  //}
-
-  auto result_fft = fftconv::convolve1d(a, b);
-  cout << "naive vs fft ";
-  if (!cmp_vec(result_naive, result_fft)) {
-    cout << "naive     : ";
-    print_vec(result_naive);
-    cout << "convolve1d: ";
-    print_vec(result_fft);
-  }
+  _test(a, b);
 
   auto arma_a = arma::vec(a);
   auto arma_b = arma::vec(b);
-  auto result_arma = arma::conv(arma_a, arma_b);
+  // auto result_arma = arma::conv(arma_a, arma_b);
 
-  auto result_fftfilt = fftconv::fftfilt(a, b);
-  cout << "naive vs fftfilt ";
-  if (!cmp_vec(result_naive, result_fftfilt)) {
-    cout << "naive  : ";
-    print_vec(result_naive);
-    cout << "fftfilt: ";
-    print_vec(result_fftfilt);
-  }
-
-  // timeit("convolve_naive", [&]() { return convolve_naive(a, b); });
-  //timeit("fftconv::convolve1d_ref",
-         //[&]() { return fftconv::convolve1d_ref(a, b); });
-  timeit("fftconv::convolve1d", [&]() { return fftconv::convolve1d(a, b); });
-  timeit("fftconv::fftfilt",
-         [&]() { return fftconv::fftfilt(a, b); });
-  timeit("arma::conv", [&]() { return arma_conv(arma_a, arma_b); });
+  //TIMEIT(fftconv::fftconv_ref, a, b);
+  TIMEIT(fftconv::fftconv, a, b);
+  TIMEIT(fftconv::fftconv_oa, a, b);
+  TIMEIT(arma_conv, arma_a, arma_b);
 }
 
 vector<double> get_vec(size_t size) {
@@ -156,7 +147,7 @@ vector<double> get_vec(size_t size) {
 
 int main() {
   // test_a_case(get_vec(22), get_vec(10));
-   //test_a_case({0, 1, 2, 3, 4, 5, 6, 7}, {0, 1, 2, 3});
+  // test_a_case({0, 1, 2, 3, 4, 5, 6, 7}, {0, 1, 2, 3});
   test_a_case(get_vec(8), get_vec(4));
   test_a_case(get_vec(1664), get_vec(65));
   test_a_case(get_vec(2816), get_vec(65));

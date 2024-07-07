@@ -8,7 +8,7 @@ import numpy as np
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-def convolve1d(double[:] a, double[:] b):
+def fftconv(double[:] a, double[:] b):
 
     cdef:
         int a_size = a.size
@@ -18,14 +18,14 @@ def convolve1d(double[:] a, double[:] b):
     result = np.zeros(padded_length, dtype=np.double)
     cdef double[:] res_view = result
 
-    cfftconv.convolve1d(&a[0], a_size, &b[0], b_size, &res_view[0])
+    cfftconv.fftconv(&a[0], a_size, &b[0], b_size, &res_view[0], padded_length)
 
     return result
 
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-def fftfilt(double[:] a, double[:] b):
+def fftconv_oa(double[:] a, double[:] b):
 
     cdef:
         int a_size = a.size
@@ -35,7 +35,7 @@ def fftfilt(double[:] a, double[:] b):
     result = np.zeros(padded_length, dtype=np.double)
     cdef double[:] res_view = result
 
-    cfftconv.fftfilt(&a[0], a_size, &b[0], b_size, &res_view[0], padded_length)
+    cfftconv.fftconv_oa(&a[0], a_size, &b[0], b_size, &res_view[0], padded_length)
 
     return result
 
