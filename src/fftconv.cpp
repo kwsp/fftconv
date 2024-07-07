@@ -6,8 +6,6 @@
 #include <shared_mutex>
 #include <unordered_map>
 
-#include <iostream>
-
 using std::vector;
 
 static int nextpow2(int x) { return 1 << (int)(std::log2(x) + 1); }
