@@ -7,6 +7,7 @@
 #include <array>
 #include <complex>
 #include <cstring>
+#include <debug_utils.hpp>
 
 std::mutex *_fftw_mutex = nullptr;
 
@@ -27,7 +28,7 @@ static constexpr std::array<std::array<size_t, 2>, 9> _optimal_oa_fft_size{
 
 // Given a filter_size, return the optimal fft size for the overlap-add
 // convolution method
-static size_t get_optimal_oa_fft_size(const size_t filter_size) {
+static size_t get_optimal_fft_size(const size_t filter_size) {
   for (const auto &pair : _optimal_oa_fft_size)
     if (filter_size < pair[0])
       return pair[1];
@@ -44,19 +45,35 @@ static inline void _copy_to_padded_buffer(const T *src, const size_t src_size,
   std::fill(dst + src_size, dst + dst_size, 0);
 }
 
+// static inline void elementwise_multiply(const fftw_complex *a,
+// const fftw_complex *b,
+// const size_t length,
+// fftw_complex *result) {
+//// fftw_complex in C89 mode is double[2], which is binary compatible with
+//// C99's <complex.h> and C++'s complex<double> template class
+//// http://www.fftw.org/doc/Complex-numbers.html
+// const auto _a = reinterpret_cast<const std::complex<double> *>(a);
+// const auto _b = reinterpret_cast<const std::complex<double> *>(b);
+// auto _res = reinterpret_cast<std::complex<double> *>(result);
+
+// for (size_t i = 0; i < length; ++i)
+//_res[i] = _a[i] * _b[i];
+//}
+
 static inline void elementwise_multiply(const fftw_complex *a,
                                         const fftw_complex *b,
                                         const size_t length,
                                         fftw_complex *result) {
-  // fftw_complex in C89 mode is double[2], which is binary compatible with
-  // C99's <complex.h> and C++'s complex<double> template class
-  // http://www.fftw.org/doc/Complex-numbers.html
-  const auto _a = reinterpret_cast<const std::complex<double> *>(a);
-  const auto _b = reinterpret_cast<const std::complex<double> *>(b);
-  auto _res = reinterpret_cast<std::complex<double> *>(result);
+  // implement naive complex multiply. This is much faster than the
+  // std version, but doesn't handle infinities.
+  // https://stackoverflow.com/questions/49438158/why-is-muldc3-called-when-two-stdcomplex-are-multiplied
 
-  for (size_t i = 0; i < length; ++i)
-    _res[i] = _a[i] * _b[i];
+  for (size_t i = 0; i < length; ++i) {
+    const double a1 = a[i][0], a2 = a[i][1];
+    const double b1 = b[i][0], b2 = b[i][1];
+    result[i][0] = a1 * b1 - a2 * b2;
+    result[i][1] = a2 * b1 + a1 * b2;
+  }
 }
 
 // enum class fft_direction { Forward = 0b01, Backward = 0b10 };
@@ -181,12 +198,13 @@ public:
   }
 };
 
+static thread_local fftconv::Cache<size_t, fftconv_plans> fftconv_plans_cache;
+
 // fftconv_plans manages the memory of the forward and backward fft plans
 // and the fftw buffers
 // Plans are for the FFTW New-Array Execute Functions
 // https://www.fftw.org/fftw3_doc/New_002darray-Execute-Functions.html
-class fftconv_plans_advanced {
-private:
+struct fftconv_plans_advanced {
   // FFTW buffer sizes
   const size_t real_sz;
   const size_t complex_sz;
@@ -204,7 +222,26 @@ private:
   fftw_plan plan_forward_signal;
   fftw_plan plan_backward_signal;
 
-public:
+  void debug_print() {
+#define PRINT(NAME) std::cout << #NAME << " (" << NAME << ") "
+    PRINT(real_sz);
+    PRINT(complex_sz);
+    PRINT(howmany);
+    std::cout << "\n";
+
+    std::cout << "real_buf_kernel";
+    print(real_buf_kernel, real_sz);
+
+    std::cout << "cx_buf_kernel";
+    print(cx_buf_kernel, complex_sz);
+
+    std::cout << "real_buf_signal";
+    print(real_buf_signal, real_sz * howmany);
+
+    std::cout << "cx_buf_signal";
+    print(cx_buf_signal, complex_sz * howmany);
+  }
+
   // Use advanced interface
   fftconv_plans_advanced(const size_t padded_length, const int howmany)
       : real_sz(padded_length), complex_sz(padded_length / 2 + 1),
@@ -272,7 +309,7 @@ public:
   }
 
   // i-th `howmany`
-  void set_signal(const double *arr, size_t sz, size_t idx) {
+  void set_signal(const double *arr, const size_t sz, const size_t idx) {
     assert(sz <= real_sz);
     assert(idx <= howmany);
     _copy_to_padded_buffer(arr, sz, real_buf_signal + idx * real_sz, real_sz);
@@ -293,22 +330,34 @@ public:
 
   void complex_multiply() {
     for (int i = 0; i < howmany; ++i)
-      elementwise_multiply(cx_buf_signal, cx_buf_kernel, complex_sz,
-                           cx_buf_signal);
+      elementwise_multiply(cx_buf_signal + i * complex_sz, cx_buf_kernel,
+                           complex_sz, cx_buf_signal + i * complex_sz);
   }
 
-  void get_output(double *arr, size_t sz, size_t idx) {
+  void get_output(double *arr, size_t sz, const size_t idx) {
     const double fct = 1. / real_sz;
     sz = std::min(real_sz, sz);
 
-    size_t pos = idx * real_sz;
+    const size_t pos = idx * real_sz;
     for (int i = 0; i < sz; ++i)
       arr[i] += real_buf_signal[pos + i] * fct;
   }
 };
 
+fftconv_plans_advanced *fftconv_plans_advanced_cache(const size_t padded_length,
+                                                     const int howmany) {
+  static thread_local std::unordered_map<
+      size_t, std::unique_ptr<fftconv_plans_advanced>>
+      _cache;
+  const size_t _hash = (padded_length << 4) ^ howmany;
+
+  auto &plan = _cache[_hash];
+  if (plan == nullptr || plan->real_sz != padded_length)
+    plan = std::make_unique<fftconv_plans_advanced>(padded_length, howmany);
+  return plan.get();
+}
+
 /////////////////////////////
-static thread_local fftconv::Cache<size_t, fftconv_plans> fftconv_plans_cache;
 
 namespace fftconv {
 
@@ -334,17 +383,17 @@ void convolve_fftw_advanced(const double *a, const size_t a_sz, const double *b,
                             const size_t b_sz, double *result,
                             const size_t res_sz) {
   const size_t padded_length = a_sz + b_sz - 1;
-  auto plans = fftconv_plans_advanced(padded_length, 1);
+  auto plans = fftconv_plans_advanced_cache(padded_length, 1);
 
-  plans.set_kernel(b, b_sz);
-  plans.forward_kernel();
+  plans->set_kernel(b, b_sz);
+  plans->forward_kernel();
 
-  plans.set_signal(a, a_sz, 0);
-  plans.forward_signal();
+  plans->set_signal(a, a_sz, 0);
+  plans->forward_signal();
 
-  plans.complex_multiply();
-  plans.backward();
-  plans.get_output(result, res_sz, 0);
+  plans->complex_multiply();
+  plans->backward();
+  plans->get_output(result, res_sz, 0);
 }
 
 // reference implementation of fftconv with no optimizations
@@ -420,7 +469,7 @@ void oaconvolve_fftw(const double *x, const size_t x_sz, const double *h,
                      const size_t h_sz, double *y, const size_t y_sz) {
 
   // const size_t N = 8 * nextpow2(h_size); // size for each fft
-  const size_t N = get_optimal_oa_fft_size(h_sz); // more optimal size for each fft
+  const size_t N = get_optimal_fft_size(h_sz); // more optimal size for each fft
   const size_t step_size = N - (h_sz - 1);
 
   // forward fft of h
@@ -443,6 +492,36 @@ void oaconvolve_fftw(const double *x, const size_t x_sz, const double *h,
     len = std::min(y_sz - pos, N);
     for (size_t i = 0; i < len; ++i)
       y[pos + i] += real_buf[i] * fct;
+  }
+}
+
+void oaconvolve_fftw_advanced(const double *x, const size_t x_sz,
+                              const double *h, const size_t h_sz, double *y,
+                              const size_t y_sz) {
+  const size_t N = get_optimal_fft_size(h_sz); // more optimal size for each fft
+  const size_t step_size = N - (h_sz - 1);
+  const size_t batch_sz = x_sz / step_size;
+
+  auto plans =
+      fftconv_plans_advanced_cache(N, batch_sz + 1); // last batch zero pad
+  plans->set_kernel(h, h_sz);
+  plans->forward_kernel();
+
+  // Copy data to plan
+  for (size_t pos = 0, idx = 0; pos < x_sz; pos += step_size, idx++) {
+    size_t len = std::min(x_sz - pos, step_size); // bound check
+    plans->set_signal(x + pos, len, idx);
+  }
+
+  plans->forward_signal();
+
+  plans->complex_multiply();
+
+  plans->backward();
+
+  for (size_t pos = 0, idx = 0; pos < y_sz; pos += step_size, idx++) {
+    size_t len = std::min(y_sz - pos, N); // bound check
+    plans->get_output(y + pos, len, idx);
   }
 }
 

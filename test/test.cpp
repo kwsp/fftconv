@@ -64,15 +64,17 @@ void _test(const vector<double> &a, const vector<double> &b) {
   CMP(convolve_fftw);
   CMP(convolve_fftw_advanced);
   CMP(oaconvolve_fftw);
+  CMP(oaconvolve_fftw_advanced);
+
   CMP(convolve_pocketfft);
   CMP(oaconvolve_pocketfft);
   CMP(convolve_pocketfft_hdr);
   CMP(oaconvolve_pocketfft_hdr);
 
   if (res)
-    std::cout << "All tests passed.\n";
+    cout << "All tests passed.\n";
   else
-    std::cout << "Some tests failed.\n";
+    cout << "Some tests failed.\n";
 }
 
 constexpr int N_RUNS = 5000;
@@ -91,6 +93,8 @@ void _bench(const vector<double> &a, const vector<double> &b) {
   TIMEIT(convolve_fftw, a, b);
   TIMEIT(convolve_fftw_advanced, a, b);
   TIMEIT(oaconvolve_fftw, a, b);
+  TIMEIT(oaconvolve_fftw_advanced, a, b);
+
   TIMEIT(convolve_pocketfft, a, b);
   TIMEIT(oaconvolve_pocketfft, a, b);
   TIMEIT(convolve_pocketfft_hdr, a, b);
@@ -105,20 +109,26 @@ void test_a_case(vector<double> a, vector<double> b) {
   _bench(a, b);
 }
 
-vector<double> get_vec(size_t size) {
+static vector<double> get_vec(size_t size) {
   vector<double> res(size);
-  for (size_t i = 0; i < size; i++) {
+  for (size_t i = 0; i < size; i++)
     res[i] = (double)(std::rand() % 10);
-  }
+  return res;
+}
+
+static vector<double> arange(size_t size) {
+  vector<double> res(size);
+  for (size_t i = 0; i < size; i++)
+    res[i] = i;
   return res;
 }
 
 int main() {
-   //test_a_case({0, 1, 2, 3, 4, 5, 6, 7}, {0, 1, 2, 3});
-  //test_a_case(get_vec(22), get_vec(10));
+  // test_a_case({0, 1, 2, 3, 4, 5, 6, 7}, {0, 1, 2, 3});
+  // test_a_case(arange(25), arange(10));
   test_a_case(get_vec(1664), get_vec(65));
   test_a_case(get_vec(2816), get_vec(65));
-   test_a_case(get_vec(2304), get_vec(65));
-   test_a_case(get_vec(4352), get_vec(65));
-  // test_a_case(get_vec(2000), get_vec(2000));
+  test_a_case(get_vec(2304), get_vec(65));
+  test_a_case(get_vec(4352), get_vec(65));
+  //   test_a_case(get_vec(2000), get_vec(2000));
 }

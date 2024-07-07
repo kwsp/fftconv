@@ -3,6 +3,8 @@
 // https://github.com/kwsp/fftconv
 #pragma once
 
+#define POCKETFFT_NO_MULTITHREADING
+
 #include <pocketfft_hdronly.h>
 extern "C" {
 #include <pocketfft.h>
@@ -10,10 +12,12 @@ extern "C" {
 
 #include <cassert>
 #include <complex>
-#include <iostream> // DEBUG
+#include <cstdlib>
 #include <memory>
 #include <unordered_map>
 #include <vector>
+
+#include "debug_utils.hpp"
 
 // Lookup table of {max_filter_size, optimal_fft_size}
 static constexpr std::array<std::array<size_t, 2>, 9> _optimal_fft_size{
@@ -89,18 +93,33 @@ void elementwise_multiply(const T *a, const T *b, const size_t length,
     result[i] = a[i] * b[i];
 }
 
+// template <class T>
+// void elementwise_multiply_half_cx(const T *a, const T *b, const size_t
+// length, T *result) {
+// result[0] = a[0] * b[0];
+// auto _a = reinterpret_cast<const std::complex<T> *>(a + 1);
+// auto _b = reinterpret_cast<const std::complex<T> *>(b + 1);
+// auto _c = reinterpret_cast<std::complex<T> *>(result + 1);
+
+// const auto _len = (length - 1) >> 1;
+// for (size_t i = 0; i < _len; ++i)
+//_c[i] = _a[i] * _b[i];
+
+// if (length % 2 == 0)
+// result[length - 1] = a[length - 1] * b[length - 1];
+//}
+
 template <class T>
 void elementwise_multiply_half_cx(const T *a, const T *b, const size_t length,
                                   T *result) {
   result[0] = a[0] * b[0];
-  auto _a = reinterpret_cast<const std::complex<T> *>(a + 1);
-  auto _b = reinterpret_cast<const std::complex<T> *>(b + 1);
-  auto _c = reinterpret_cast<std::complex<T> *>(result + 1);
-
-  auto _len = (length - 1) >> 1;
-  for (size_t i = 0; i < _len; ++i) {
-    _c[i] = _a[i] * _b[i];
+  for (size_t i = 1; i < length - 1; i += 2) {
+    const T a1 = a[i], a2 = a[i + 1];
+    const T b1 = b[i], b2 = b[i + 1];
+    result[i] = a1 * b1 - a2 * b2;
+    result[i + 1] = a2 * b1 + a1 * b2;
   }
+
   if (length % 2 == 0)
     result[length - 1] = a[length - 1] * b[length - 1];
 }
@@ -133,6 +152,26 @@ template <class T> struct Bufs {
 };
 
 static thread_local Cache<size_t, Bufs<double>> bufs_cache;
+
+template <class T> struct Bufs_half_cx {
+  const size_t size_r;
+  T *A_buf;
+  T *B_buf;
+  const pocketfft::shape_t shape_r;
+  const pocketfft::stride_t stride_r;
+  const pocketfft::stride_t stride_c;
+
+  Bufs_half_cx(const size_t size_r)
+      : size_r(size_r), A_buf(new double[size_r]), B_buf(new double[size_r]),
+        shape_r({size_r}), stride_r({sizeof(T)}), stride_c({sizeof(T)}) {}
+
+  ~Bufs_half_cx() {
+    delete[] A_buf;
+    delete[] B_buf;
+  }
+};
+
+static thread_local Cache<size_t, Bufs_half_cx<double>> bufs_half_cx_cache;
 
 struct pocketfft_plan {
   double *a_buf;
@@ -228,46 +267,46 @@ inline void convolve_pocketfft_hdr(const double *a, const size_t a_sz,
                                    size_t nthreads = 1) {
   using namespace pocketfft;
   using std::complex;
-  const size_t axis = 0;
+
+  const shape_t axis = {0};
 
   // length of the real arrays, including the final convolution output
   const size_t size_r = a_sz + b_sz - 1;
-  const size_t size_c = (size_r >> 1) + 1;
+  // const size_t size_c = (size_r >> 1) + 1;
 
   // Allocate buffers
-  auto bufs = bufs_cache.get(size_r);
-  auto r_buf = bufs->r_buf;
+  auto bufs = bufs_half_cx_cache.get(size_r);
   auto A_buf = bufs->A_buf;
   auto B_buf = bufs->B_buf;
-  const shape_t shape_r = bufs->shape_r;
-  const shape_t shape_c = bufs->shape_c;
-  const stride_t stride_r = bufs->stride_r;
-  const stride_t stride_c = bufs->stride_c;
+  const auto &shape_r = bufs->shape_r;
+  const auto &stride_r = bufs->stride_r;
+  const auto &stride_c = bufs->stride_c;
 
-  _copy_to_padded_buffer(a, a_sz, r_buf, size_r);
-  pocketfft::r2c(shape_r, stride_r, stride_c, axis, FORWARD, r_buf, A_buf, 1.,
-                 nthreads);
+  _copy_to_padded_buffer(a, a_sz, A_buf, size_r);
+  pocketfft::r2r_fftpack(shape_r, stride_r, stride_c, axis, true, FORWARD,
+                         A_buf, A_buf, 1., nthreads);
   // std::cout << "A_buf: ";
-  // print(A_buf, size_c);
+  // print(A_buf, size_r);
 
-  _copy_to_padded_buffer(b, b_sz, r_buf, size_r);
-  pocketfft::r2c(shape_r, stride_r, stride_c, axis, FORWARD, r_buf, B_buf, 1.,
-                 nthreads);
+  _copy_to_padded_buffer(b, b_sz, B_buf, size_r);
+  pocketfft::r2r_fftpack(shape_r, stride_r, stride_c, axis, true, FORWARD,
+                         B_buf, B_buf, 1., nthreads);
   // std::cout << "B_buf: ";
-  // print(B_buf, size_c);
+  // print(B_buf, size_r);
 
-  elementwise_multiply(A_buf, B_buf, size_c, A_buf);
+  elementwise_multiply_half_cx(A_buf, B_buf, size_r, A_buf);
   // std::cout << "A_buf: ";
-  // print(A_buf, size_c);
+  // print(A_buf, size_r);
 
-  pocketfft::c2r(shape_r, stride_c, stride_r, axis, BACKWARD, A_buf, r_buf,
-                 1. / size_r, nthreads);
+  pocketfft::r2r_fftpack(shape_r, stride_c, stride_r, axis, false, BACKWARD,
+                         A_buf, A_buf, 1., nthreads); // normalize later
   // std::cout << "r    : ";
   // print(r_buf, size_r);
 
   const auto end = std::min(size_r, res_sz);
+  const double fct = 1. / size_r;
   for (size_t i = 0; i < end; ++i)
-    res[i] = r_buf[i];
+    res[i] = A_buf[i] * fct;
 }
 
 inline void oaconvolve_pocketfft_hdr(const double *a, const size_t a_sz,
@@ -275,42 +314,38 @@ inline void oaconvolve_pocketfft_hdr(const double *a, const size_t a_sz,
                                      double *res, const size_t res_sz,
                                      size_t nthreads = 1) {
   using namespace pocketfft;
-  using std::complex;
 
-  const size_t axis = 0;
+  const shape_t axis{0};
 
   const size_t size_r = get_optimal_fft_size(b_sz);
   const size_t step_size = size_r - (b_sz - 1);
-  const size_t size_c = (size_r >> 1) + 1;
+  // const size_t size_c = (size_r >> 1) + 1;
 
   // Allocate buffers
-  auto bufs = bufs_cache.get(size_r);
-  auto r_buf = bufs->r_buf;
+  auto bufs = bufs_half_cx_cache.get(size_r);
   auto A_buf = bufs->A_buf;
   auto B_buf = bufs->B_buf;
-  const shape_t shape_r = bufs->shape_r;
-  const shape_t shape_c = bufs->shape_c;
-  const stride_t stride_r = bufs->stride_r;
-  const stride_t stride_c = bufs->stride_c;
+  const auto &shape_r = bufs->shape_r;
+  const auto &stride_r = bufs->stride_r;
+  const auto &stride_c = bufs->stride_c;
 
-  _copy_to_padded_buffer(b, b_sz, r_buf, size_r);
-  pocketfft::r2c(shape_r, stride_r, stride_c, axis, FORWARD, r_buf, B_buf, 1.,
-                 nthreads);
-  // std::cout << "B_buf: ";
-  // print(B_buf, size_c);
+  _copy_to_padded_buffer(b, b_sz, B_buf, size_r);
+  pocketfft::r2r_fftpack(shape_r, stride_r, stride_c, axis, true, FORWARD,
+                         B_buf, B_buf, 1., nthreads);
 
+  const double fct = 1. / size_r;
   for (size_t pos = 0; pos < a_sz; pos += step_size) {
     size_t len = std::min(a_sz - pos, step_size);
-    _copy_to_padded_buffer(a + pos, len, r_buf, size_r);
-    pocketfft::r2c(shape_r, stride_r, stride_c, axis, FORWARD, r_buf, A_buf, 1.,
-                   nthreads);
-    elementwise_multiply(A_buf, B_buf, size_c, A_buf);
-    pocketfft::c2r(shape_r, stride_c, stride_r, axis, BACKWARD, A_buf, r_buf,
-                   1., nthreads); // normalize later
+    _copy_to_padded_buffer(a + pos, len, A_buf, size_r);
+    pocketfft::r2r_fftpack(shape_r, stride_r, stride_c, axis, true, FORWARD,
+                           A_buf, A_buf, 1., nthreads);
+    elementwise_multiply_half_cx(A_buf, B_buf, size_r, A_buf);
+    pocketfft::r2r_fftpack(shape_r, stride_c, stride_r, axis, false, BACKWARD,
+                           A_buf, A_buf, 1., nthreads); // normalize later
 
     len = std::min(res_sz - pos, size_r);
     for (size_t i = 0; i < len; ++i)
-      res[pos + i] += r_buf[i] / size_r;
+      res[pos + i] += A_buf[i] * fct;
   }
 }
 
