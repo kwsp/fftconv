@@ -38,19 +38,16 @@ CPU: Apple M1
 === test case (1664, 65) ===
 Vectors are equal.
 Vectors are equal.
-    (5000 runs) ffconv::convolve1d_ref took 223ms
     (5000 runs) ffconv::convolve1d took 49ms
     (5000 runs) arma::conv took 110ms
 === test case (2816, 65) ===
 Vectors are equal.
 Vectors are equal.
-    (5000 runs) ffconv::convolve1d_ref took 246ms
     (5000 runs) ffconv::convolve1d took 86ms
     (5000 runs) arma::conv took 183ms
 === test case (2000, 2000) ===
 Vectors are equal.
 Vectors are equal.
-    (5000 runs) ffconv::convolve1d_ref took 886ms
     (5000 runs) ffconv::convolve1d took 667ms
     (5000 runs) arma::conv took 17440ms
 ```
