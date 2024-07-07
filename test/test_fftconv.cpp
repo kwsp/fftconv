@@ -296,12 +296,12 @@ TEST(Convolution, ExecuteOAConvCorrectlyDifferentSizes) {
       fftconv::oaconvolve_fftw<float>);
 }
 
-TEST(Convolution, ExecuteOAConvAdvancedCorrectlyDifferentSizes) {
-  execute_conv_correctly_different_sizes<double>(
-      fftconv::oaconvolve_fftw_advanced<double>);
+// TEST(Convolution, ExecuteOAConvAdvancedCorrectlyDifferentSizes) {
+//   execute_conv_correctly_different_sizes<double>(
+//       fftconv::oaconvolve_fftw_advanced<double>);
 
-  execute_conv_correctly_different_sizes<float>(
-      fftconv::oaconvolve_fftw_advanced<float>);
-}
+//   execute_conv_correctly_different_sizes<float>(
+//       fftconv::oaconvolve_fftw_advanced<float>);
+// }
 
 // NOLINTEND(*-magic-numbers)

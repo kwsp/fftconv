@@ -6,19 +6,19 @@ enable_testing()
 find_package(Armadillo CONFIG)
 find_package(GTest CONFIG REQUIRED)
 
+
 add_executable(test_script_fftconv)
 target_sources(test_script_fftconv
     PRIVATE
     test_script.cpp
 )
-
-
 target_link_libraries(test_script_fftconv
     PRIVATE
     armadillo
     fftconv
     fftconv_pocket
 )
+
 
 add_executable(test_fftconv)
 target_sources(test_fftconv
@@ -34,3 +34,6 @@ target_link_libraries(test_fftconv
     GTest::gmock
     GTest::gmock_main
 )
+
+include(GoogleTest)
+gtest_discover_tests(test_fftconv)
