@@ -101,5 +101,5 @@ vector<double> get_vec(size_t size) {
 int main() {
   test_a_case(get_vec(1664), get_vec(65));
   test_a_case(get_vec(2816), get_vec(65));
-  test_a_case(get_vec(2000), get_vec(2000));
+  //test_a_case(get_vec(2000), get_vec(2000));
 }

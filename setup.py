@@ -4,8 +4,8 @@ from Cython.Build import cythonize
 extensions = [
     Extension(
         "fftconv",
-        sources=["./pyfftconv/*.pyx"],
-        include_dirs=["include", "/opt/homebrew/include"],
+        sources=["./pyfftconv/*.pyx", "./src/fftconv.cpp"],
+        include_dirs=["./src", "/opt/homebrew/include"],
         libraries=["fftw3"],
         library_dirs=["/opt/homebrew/lib"],
         extra_compile_args=["-std=c++17", "-O3", "-Wno-sign-compare"],
