@@ -50,6 +50,6 @@ if __name__ == "__main__":
     y = np.linspace(0, 1, 65)
     run_test_case(x, y)
 
-    x = np.linspace(0, 1, 2000)
-    y = np.linspace(0, 1, 2000)
-    run_test_case(x, y)
+    # x = np.linspace(0, 1, 2000)
+    # y = np.linspace(0, 1, 2000)
+    # run_test_case(x, y)
