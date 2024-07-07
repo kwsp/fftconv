@@ -2,7 +2,7 @@
 #include <cassert>
 #include <complex>
 #include <memory>
-#include <unordered_map>
+#include <map>
 #include <vector>
 
 #include <fftw3.h>
@@ -11,6 +11,7 @@ namespace fftconv {
 using std::vector;
 
 // fftconv_plans manages the memory of the forward and backward fft plans
+// Assume the same FFTW plan will be used many times (use FFTW_MEASURE to compute optimal plan)
 struct fftconv_plans {
   fftw_plan forward;
   fftw_plan backward;
@@ -26,9 +27,9 @@ struct fftconv_plans {
 
     // Compute the plans
     this->forward = fftw_plan_dft_r2c_1d(padded_length, real_buf, complex_buf,
-                                         FFTW_ESTIMATE);
+                                         FFTW_MEASURE);
     this->backward = fftw_plan_dft_c2r_1d(padded_length, complex_buf, real_buf,
-                                          FFTW_ESTIMATE);
+                                          FFTW_MEASURE);
 
     fftw_free(real_buf);
     fftw_free(complex_buf);
@@ -40,7 +41,7 @@ struct fftconv_plans {
 };
 
 // Global cache of FFTW plans
-std::unordered_map<size_t, std::shared_ptr<fftconv_plans>> _fftconv_plans_cache;
+std::map<size_t, std::shared_ptr<fftconv_plans>> _fftconv_plans_cache;
 
 std::shared_ptr<fftconv_plans> _get_fftconv_plans(size_t padded_size) {
   auto it = _fftconv_plans_cache.find(padded_size);
