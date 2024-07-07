@@ -23,7 +23,7 @@ void convolve1d(const double *a, const size_t a_size, const double *b,
 
 // Vector interface to the fft convolution implementation
 inline std::vector<double> convolve1d(const std::vector<double> &a,
-                                 const std::vector<double> &b) {
+                                      const std::vector<double> &b) {
   int padded_length = a.size() + b.size() - 1;
   std::vector<double> result(padded_length);
   convolve1d(a.data(), a.size(), b.data(), b.size(), result.data());
@@ -35,7 +35,16 @@ void convolve1d_ref(const double *a, const size_t a_size, const double *b,
                     const size_t b_size, double *result);
 
 // Vector interface to the above reference fft convolution implementation
-std::vector<double> convolve1d_ref(const std::vector<double> &a, const std::vector<double> &b);
+std::vector<double> convolve1d_ref(const std::vector<double> &a,
+                                   const std::vector<double> &b);
+
+std::vector<double> fftfilt(const std::vector<double> &b,
+                            const std::vector<double> &x);
+
+void fftfilt(const double *x, const size_t x_size, const double *b,
+             const size_t b_size, double *y, const size_t y_size);
+std::vector<double> fftfilt(const std::vector<double> &x,
+                            const std::vector<double> &b);
 
 } // namespace fftconv
 #endif // __FFTCONV_H__
