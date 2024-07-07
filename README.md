@@ -4,23 +4,32 @@ Extremely fast 1D discrete convolutions of real vectors in a header-only library
 
 It's well know that convolution in the time domain is equivalent to multiplication in the frequency domain. With the Fast Fourier Transform, we can reduce the time complexity of a discrete convolution from `O(n^2)` to `O(n log(n))`, where `n` is the larger of the two array sizes.
 
-To test, run `gen_input.py` to generate 3 test cases. Compile `test.c` with `make` (make sure libfftw3 is installed in a location visible to the compiler). Run `make test` to test for correctness and performance.
 
-A Cython wrapper is provided so the routine can be called in Python.
 ## Build
 
 **C++**
 
 `fftconv` is header only, so just include the header with `#include "fftconv.h"`. However, you need to have `fftw3` installed, with the `fftw3.h` header visible to the compiler and `libfftw3` visible to the linker.
 
-To run the test and benchmark, you need to install the [Armadillo library](http://arma.sourceforge.net/) (benchmarked against), and then run `make` to build and `make test` to run the test and benchmark.
+To run the test and benchmark, you need to install the [Armadillo library](http://arma.sourceforge.net/) (benchmarked against).
+
+```
+make       # build the test/benchmark
+make test  # run the test/benchmark
+```
 
 **Python**
 
-Install Cython, then run `python3 setup.py build_ext -i` to build the extension. Run the `test.py` script to test and benchmark.
+A Cython wrapper is provided. Similar to C++, make sure `fftw3` is installed and visible to the compiler on your system. Install Cython, then run 
 
+```
+python3 setup.py build_ext -i   # build extension
+python3 test.py                 # run the test/benchmark
+```
 
-## Benchmarks
+## Benchmark results
+
+CPU: Apple M1
 
 **C++**. 1D convolution in `fftconv` is more than 2x faster than the Armadillo implementation.
 
