@@ -1,46 +1,64 @@
+// Author: Tiger Nie
+// 2022
+
 #include "fftconv.h"
 #include <memory>
 #include <shared_mutex>
 #include <unordered_map>
 
+using std::vector;
+
 // fftconv_plans manages the memory of the forward and backward fft plans
-// Assume the same FFTW plan will be used many times (use FFTW_MEASURE to
-// compute optimal plan)
+// and the fftw buffers
 struct fftconv_plans {
+
+  // FFTW plans
   fftw_plan forward;
   fftw_plan backward;
 
-  // NOT THREAD-SAFE RIGHT NOW
+  // FFTW buffers corresponding to the above plans
   double *real_buf;
   fftw_complex *complex_buf_a;
   fftw_complex *complex_buf_b;
 
+  // Constructors
   fftconv_plans(size_t padded_length);
+  fftconv_plans() = delete; // default constructor
 
+  fftconv_plans(fftconv_plans &&) = delete;      // move constructor
+  fftconv_plans(const fftconv_plans &) = delete; // copy constructor
+
+  fftconv_plans &operator=(const fftconv_plans) = delete; // copy assignment
+  fftconv_plans &operator=(fftconv_plans &&) = delete;    // move assignment
+
+  // Destructor
   ~fftconv_plans() {
+
     fftw_destroy_plan(forward);
     fftw_destroy_plan(backward);
+
     fftw_free(real_buf);
     fftw_free(complex_buf_a);
     fftw_free(complex_buf_b);
   }
 };
 
+// Compute the fftw plans and allocate buffers
 fftconv_plans::fftconv_plans(size_t padded_length) {
 
   // length of the complex arrays
   size_t complex_length = padded_length / 2 + 1;
 
-  // Allocate temporary buffers for the purposes of creating the plans...
+  // Allocate buffers for the purposes of creating the plans...
   real_buf = fftw_alloc_real(padded_length);
   complex_buf_a = fftw_alloc_complex(complex_length);
   complex_buf_b = fftw_alloc_complex(complex_length);
 
   // Compute the plans
-  this->forward = fftw_plan_dft_r2c_1d(padded_length, real_buf, complex_buf_a,
-                                       FFTW_ESTIMATE);
-  this->backward = fftw_plan_dft_c2r_1d(padded_length, complex_buf_a, real_buf,
-                                        FFTW_ESTIMATE);
+  forward = fftw_plan_dft_r2c_1d(padded_length, real_buf, complex_buf_a,
+                                 FFTW_ESTIMATE);
+  backward = fftw_plan_dft_c2r_1d(padded_length, complex_buf_a, real_buf,
+                                  FFTW_ESTIMATE);
 }
 
 // Thread-local hash map cache to store fftw plans and buffers.
@@ -50,6 +68,9 @@ thread_local std::unordered_map<size_t, std::shared_ptr<fftconv_plans>> _cache;
 // Mutex - fftw plan computation is not thread-safe by default
 std::shared_mutex _mutex;
 
+// Get fftconv_plans object.
+// The cached object will be returned if available.
+// Otherwise, a new one will be constructed.
 std::shared_ptr<fftconv_plans> _get_plans(size_t size) {
   std::shared_ptr<fftconv_plans> plans;
   {
@@ -67,6 +88,27 @@ std::shared_ptr<fftconv_plans> _get_plans(size_t size) {
     _cache[size] = plans;
   }
   return plans;
+}
+
+void vector_elementwise_multiply(const fftw_complex *a, const fftw_complex *b,
+                                 const size_t length, fftw_complex *result) {
+  for (auto i = 0; i < length; ++i) {
+    std::complex<double> _a(a[i][0], a[i][1]);
+    std::complex<double> _b(b[i][0], b[i][1]);
+    _a *= _b;
+    result[i][0] = _a.real();
+    result[i][1] = _a.imag();
+  }
+}
+
+// Copy data from src to dst and padded the extra with zero
+// dst_size must be greater than src_size
+template <class T>
+void _copy_to_padded_buffer(const T *src, const size_t src_size, T *dst,
+                            const size_t dst_size) {
+  assert(src_size <= dst_size);
+  std::copy(src, src + src_size, dst);
+  std::fill(dst + src_size, dst + dst_size, 0);
 }
 
 namespace fftconv {
