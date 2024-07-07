@@ -25,14 +25,14 @@ target_sources(test_fftconv
     PRIVATE
     test_fftconv.cpp
 )
+# On Windows, linking GTest::gmock causes gtest to not discover any tests
+# https://github.com/google/googletest/issues/2157
 target_link_libraries(test_fftconv
     PRIVATE
     armadillo
     fftconv
     GTest::gtest
     GTest::gtest_main
-    GTest::gmock
-    GTest::gmock_main
 )
 
 include(GoogleTest)
