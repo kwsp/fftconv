@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+  <Type Name="fftconv::internal::fftw_buffer&lt;*&gt;">
+    <DisplayString>{{ size={m_size} }}</DisplayString>
+    <Expand>
+      <ArrayItems>
+        <Size>m_size</Size>
+        <ValuePointer>m_data</ValuePointer>
+      </ArrayItems>
+    </Expand>
+  </Type>
+
+  <Type Name="fftconv::internal::fftw_buffer&lt;double&gt;">
+      <DisplayString>{{ size={m_size} }}</DisplayString>
+      <Expand>
+        <ArrayItems>
+          <Size>m_size</Size>
+          <ValuePointer>(double*)m_data</ValuePointer>
+        </ArrayItems>
+      </Expand>
+  </Type>
+
+  <Type Name="fftconv::internal::fftw_buffer&lt;float&gt;">
+      <DisplayString>{{ size={m_size} }}</DisplayString>
+      <Expand>
+        <ArrayItems>
+          <Size>m_size</Size>
+          <ValuePointer>(float*)m_data</ValuePointer>
+        </ArrayItems>
+      </Expand>
+  </Type>
+
+  <!-- Specialization for fftw_complex which is a double[2] -->
+  <Type Name="fftconv::internal::fftw_buffer&lt;fftw_complex&gt;">
+    <DisplayString>{{ size={m_size} }}</DisplayString>
+    <Expand>
+      <ArrayItems>
+        <Size>m_size</Size>
+        <ValuePointer>(double(*)[2])m_data</ValuePointer>
+      </ArrayItems>
+      <Synthetic Name="[Real]">
+        <DisplayString>{m_data, $i, $e}</DisplayString>
+        <Expand>
+          <ArrayItems>
+            <Size>m_size</Size>
+            <ValuePointer>(double*)m_data</ValuePointer>
+            <ValueNode>(double*)m_data[$i*2]</ValueNode>
+          </ArrayItems>
+        </Expand>
+      </Synthetic>
+      <Synthetic Name="[Imag]">
+        <DisplayString>{m_data, $i, $e}</DisplayString>
+        <Expand>
+          <ArrayItems>
+            <Size>m_size</Size>
+            <ValuePointer>((double*)m_data)+1</ValuePointer>
+            <ValueNode>(double*)m_data[$i*2+1]</ValueNode>
+          </ArrayItems>
+        </Expand>
+      </Synthetic>
+    </Expand>
+  </Type>
+
+  <!-- Specialization for fftwf_complex which is a float[2] -->
+  <Type Name="fftconv::internal::fftw_buffer&lt;fftwf_complex&gt;">
+    <DisplayString>{{ size={m_size} }}</DisplayString>
+    <Expand>
+      <ArrayItems>
+        <Size>m_size</Size>
+        <ValuePointer>(float(*)[2])m_data</ValuePointer>
+      </ArrayItems>
+      <Synthetic Name="[Real]">
+        <DisplayString>{m_data, $i, $e}</DisplayString>
+        <Expand>
+          <ArrayItems>
+            <Size>m_size</Size>
+            <ValuePointer>(float*)m_data</ValuePointer>
+            <ValueNode>(float*)m_data[$i*2]</ValueNode>
+          </ArrayItems>
+        </Expand>
+      </Synthetic>
+      <Synthetic Name="[Imag]">
+        <DisplayString>{m_data, $i, $e}</DisplayString>
+        <Expand>
+          <ArrayItems>
+            <Size>m_size</Size>
+            <ValuePointer>((float*)m_data)+1</ValuePointer>
+            <ValueNode>(float*)m_data[$i*2+1]</ValueNode>
+          </ArrayItems>
+        </Expand>
+      </Synthetic>
+    </Expand>
+  </Type>
+
+</AutoVisualizer>

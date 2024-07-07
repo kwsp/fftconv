@@ -1,77 +1,67 @@
 #include <benchmark/benchmark.h>
-#include <cstdlib>
-#include <functional>
-#include <vector>
+#include <span>
 
 #include "fftconv.hpp"
-#include "fftconv_pocket.hpp"
+// #include "fftconv_pocket.hpp"
 #include <armadillo>
 
 using std::vector;
 
 //------------------ Helper functions
 
-// This function computes the discrete convolution of two arrays:
-// result[i] = a[i]*b[0] + a[i-1]*b[1] + ... + a[0]*b[i]
-static vector<double> convolve_naive(const vector<double> &a,
-                                     const vector<double> &b) {
-  const int n_a = a.size();
-  const int n_b = b.size();
-  const size_t conv_sz = n_a + n_b - 1;
-
-  vector<double> result(conv_sz);
-
-  for (int i = 0; i < conv_sz; ++i) {
-    double sum = 0.0;
-    for (int j = 0; j <= i; ++j)
-      sum += ((j < n_a) && (i - j < n_b)) ? a[j] * b[i - j] : 0.0;
-    result[i] = sum;
-  }
-  return result;
-}
-
-static vector<double> get_vec(size_t size) {
-  vector<double> res(size);
-  for (size_t i = 0; i < size; i++) {
-    res[i] = (double)(std::rand() % 10);
-  }
-  return res;
-}
-
 // Wrapper to prevent arma::conv from being optimized away
-void convolve_armadillo(vector<double> &a, vector<double> &b) {
-  const arma::vec _a(a.data(), a.size(), false, true);
-  const arma::vec _b(b.data(), b.size(), false, true);
-  volatile arma::vec res = arma::conv(_a, _b);
+// Not storing results back in res.
+template <fftconv::FloatOrDouble Real>
+void arma_conv(const std::span<const Real> span1,
+               const std::span<const Real> span2, std::span<Real> span_res) {
+  const arma::vec vec1(span1.data(), span1.size(), false, true);
+  const arma::vec vec2(span2.data(), span2.size(), false, true);
+  volatile arma::vec res = arma::conv(vec1, vec2);
 }
 
-//------------------ Benchmarks
-#define MAKE_BM_FUNC(NAME, FUNC)                                               \
-  void NAME(benchmark::State &state) {                                         \
-    auto a = get_vec(state.range(0));                                          \
-    auto b = get_vec(state.range(1));                                          \
-    for (auto _ : state)                                                       \
-      FUNC(a, b);                                                              \
+template <fftconv::FloatOrDouble Real, typename Func>
+void conv_bench_full(benchmark::State &state, Func conv_func) {
+  arma::Col<Real> vec1(state.range(0), arma::fill::randn);
+  arma::Col<Real> vec2(state.range(1), arma::fill::randn);
+  arma::Col<Real> res(vec1.size() + vec2.size() - 1);
+
+  const std::span<const Real> span1(vec1);
+  const std::span<const Real> span2(vec2);
+  std::span<Real> span_res(res);
+
+  for (auto _ : state) {
+    conv_func(vec1, vec2, res);
   }
+}
 
-// First arg is signal length, second arg is kernel length
-#define REGISTER_BENCHMARK(BM_FUNC)                                            \
-  BENCHMARK(BM_FUNC)->ArgsProduct(                                             \
-      {{1000, 1664, 2304, 2816, 3326, 4352}, {15, 35, 65, 95}});
+const std::vector<std::vector<int64_t>> args{
+    {{1000, 1664, 2304, 2816, 3326, 4352}, {15, 35, 65, 95}}};
 
-#define REGISTER(FUNC)                                                         \
-  MAKE_BM_FUNC(BM_##FUNC, FUNC)                                                \
-  REGISTER_BENCHMARK(BM_##FUNC)
+template <fftconv::FloatOrDouble Real>
+void BM_oaconvolve(benchmark::State &state) {
+  conv_bench_full<Real>(state, fftconv::oaconvolve_fftw<Real>);
+}
+BENCHMARK(BM_oaconvolve<double>)->ArgsProduct(args);
+BENCHMARK(BM_oaconvolve<float>)->ArgsProduct(args);
 
-using namespace fftconv;
+template <fftconv::FloatOrDouble Real>
+void BM_convolve(benchmark::State &state) {
+  conv_bench_full<Real>(state, fftconv::convolve_fftw<Real>);
+}
+BENCHMARK(BM_convolve<double>)->ArgsProduct(args);
+BENCHMARK(BM_convolve<float>)->ArgsProduct(args);
 
-//REGISTER(convolve_naive)
-//REGISTER(convolve_fftw)
-REGISTER(oaconvolve_fftw)
-//REGISTER(convolve_pocketfft)
-REGISTER(oaconvolve_pocketfft)
-//REGISTER(convolve_pocketfft_hdr)
-REGISTER(oaconvolve_pocketfft_hdr)
-//REGISTER(convolve_armadillo)
+// REGISTER(convolve_armadillo)
+template <fftconv::FloatOrDouble Real>
+void BM_arma_conv(benchmark::State &state) {
+  conv_bench_full<Real>(state, arma_conv<Real>);
+}
+BENCHMARK(BM_convolve<double>)->ArgsProduct(args);
+BENCHMARK(BM_convolve<float>)->ArgsProduct(args);
+
+// REGISTER(convolve_pocketfft)
+// REGISTER(oaconvolve_pocketfft)
+// REGISTER(convolve_pocketfft_hdr)
+// REGISTER(oaconvolve_pocketfft_hdr)
 
 BENCHMARK_MAIN();
