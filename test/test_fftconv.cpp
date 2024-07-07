@@ -304,4 +304,29 @@ TEST(Convolution, ExecuteOAConvCorrectlyDifferentSizes) {
 //       fftconv::oaconvolve_fftw_advanced<float>);
 // }
 
+// Test convolution
+template <fftconv::FloatOrDouble Real, typename Func>
+void execute_oaconv_same_correctly(Func conv_func) {
+  const int ksize = 65;
+  const arma::Col<Real> kernel(ksize, arma::fill::randn);
+  for (int real_size = 200; real_size < 501; real_size += 150) {
+    const arma::Col<Real> arr(real_size, arma::fill::randn);
+    const arma::Col<Real> expected = arma::conv(arr, kernel, "same");
+
+    arma::Col<Real> res(arr.size(), arma::fill::zeros);
+
+    conv_func(std::span<const Real>(arr), std::span<const Real>(kernel),
+              std::span<Real>(res));
+
+    ExpectVectorsNear(std::span<const Real>(res),
+                      std::span<const Real>(expected), Tol<Real>()());
+  }
+}
+
+TEST(OAConvolveSame, ExecuteCorrectly) {
+  execute_oaconv_same_correctly<double>(fftconv::oaconvolve_fftw_same<double>);
+
+  // execute_oaconv_same_correctly<float>(fftconv::oaconvolve_fftw_same<float>);
+}
+
 // NOLINTEND(*-magic-numbers)
