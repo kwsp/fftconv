@@ -71,23 +71,21 @@
       "displayName": "Clang Release",
       "inherits": "clang",
       "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_C_FLAGS_RELEASE": "${CMAKE_C_FLAGS_RELEASE} -g",
+        "CMAKE_CXX_FLAGS_RELEASE": "${CMAKE_CXX_FLAGS_RELEASE} -g"
+      }
+    },
+    {
+      "name": "clang-dist",
+      "displayName": "Clang Dist",
+      "inherits": "clang",
+      "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release"
       }
     }
   ],
   "buildPresets": [
-    {
-      "name": "debug",
-      "configurePreset": "debug",
-      "displayName": "Debug",
-      "description": "Debug build with no special settings"
-    },
-    {
-      "name": "release",
-      "configurePreset": "release",
-      "displayName": "Release",
-      "description": "Release build with no special settings"
-    },
     {
       "name": "Win64 Release",
       "configurePreset": "win64",
