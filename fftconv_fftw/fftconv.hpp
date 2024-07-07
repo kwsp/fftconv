@@ -1,6 +1,8 @@
 // Author: Taylor Nie
 // 2022 - 2024
 // https://github.com/kwsp/fftconv
+//
+// Version 0.2.0
 #pragma once
 
 #include <array>
