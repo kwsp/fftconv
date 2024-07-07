@@ -61,37 +61,35 @@ fftconv_plans::fftconv_plans(size_t padded_length) {
                                   FFTW_ESTIMATE);
 }
 
-// Thread-local hash map cache to store fftw plans and buffers.
-// The thread-local is mainly to make the buffers reusable
-// This does mean we need to compute the same plan in all threads
-thread_local std::unordered_map<size_t, std::shared_ptr<fftconv_plans>> _cache;
+// hash map cache to store fftw plans and buffers.
+static std::unordered_map<size_t, std::unique_ptr<fftconv_plans>> _cache;
 // Mutex - fftw plan computation is not thread-safe by default
+// and std container read-write is not thread-safe
 std::shared_mutex _mutex;
 
 // Get fftconv_plans object.
 // The cached object will be returned if available.
 // Otherwise, a new one will be constructed.
-std::shared_ptr<fftconv_plans> _get_plans(size_t size) {
-  std::shared_ptr<fftconv_plans> plans;
-  {
-    // _cache is thread_local so we don't need a read lock to access
-    std::shared_lock read_lock(_mutex);
-    auto it = _cache.find(size);
-    if (it != _cache.end())
-      plans = it->second;
-  }
-  if (plans == nullptr) {
-    // We need an exclusive lock to access the cache because creation of
-    // fftw_plans is not thread-safe by default
-    std::unique_lock write_lock(_mutex);
-    plans = std::make_shared<fftconv_plans>(size);
-    _cache[size] = plans;
-  }
-  return plans;
+static fftconv_plans *_get_plans(size_t size) {
+  // _cache is thread_local so we don't need a read lock to access
+  _mutex.lock_shared();
+  auto &plans = _cache[size];
+  _mutex.unlock_shared();
+  if (plans)
+    return plans.get();
+
+  // We need an exclusive lock to access the cache because creation of
+  // fftw_plans is not thread-safe by default
+  _mutex.lock();
+  plans = std::make_unique<fftconv_plans>(size);
+  _mutex.unlock();
+  return plans.get();
 }
 
-void vector_elementwise_multiply(const fftw_complex *a, const fftw_complex *b,
-                                 const size_t length, fftw_complex *result) {
+static void vector_elementwise_multiply(const fftw_complex *a,
+                                        const fftw_complex *b,
+                                        const size_t length,
+                                        fftw_complex *result) {
   for (auto i = 0; i < length; ++i) {
     std::complex<double> _a(a[i][0], a[i][1]);
     std::complex<double> _b(b[i][0], b[i][1]);
@@ -104,8 +102,8 @@ void vector_elementwise_multiply(const fftw_complex *a, const fftw_complex *b,
 // Copy data from src to dst and padded the extra with zero
 // dst_size must be greater than src_size
 template <class T>
-void _copy_to_padded_buffer(const T *src, const size_t src_size, T *dst,
-                            const size_t dst_size) {
+static void _copy_to_padded_buffer(const T *src, const size_t src_size, T *dst,
+                                   const size_t dst_size) {
   assert(src_size <= dst_size);
   std::copy(src, src + src_size, dst);
   std::fill(dst + src_size, dst + dst_size, 0);
@@ -121,7 +119,7 @@ void convolve1d(const double *a, const size_t a_size, const double *b,
   size_t complex_length = padded_length / 2 + 1;
 
   // Get cached plans
-  std::shared_ptr<fftconv_plans> plans = _get_plans(padded_length);
+  fftconv_plans *plans = _get_plans(padded_length);
 
   // Get fftw buffers
   double *const real_buf = plans->real_buf;
