@@ -13,7 +13,7 @@ std::mutex *_fftw_mutex = nullptr;
 // static int nextpow2(int x) { return 1 << (int)(std::log2(x) + 1); }
 
 // Lookup table of {max_filter_size, optimal_fft_size}
-static constexpr std::array<std::array<size_t, 2>, 9> _optimal_fft_size{
+static constexpr std::array<std::array<size_t, 2>, 9> _optimal_oa_fft_size{
     {{7, 16},
      {12, 32},
      {21, 64},
@@ -28,7 +28,7 @@ static constexpr std::array<std::array<size_t, 2>, 9> _optimal_fft_size{
 // Given a filter_size, return the optimal fft size for the overlap-add
 // convolution method
 static size_t get_optimal_fft_size(const size_t filter_size) {
-  for (const auto &pair : _optimal_fft_size)
+  for (const auto &pair : _optimal_oa_fft_size)
     if (filter_size < pair[0])
       return pair[1];
   return 8192;
@@ -181,8 +181,8 @@ namespace fftconv {
 
 void use_fftw_mutex(std::mutex *fftw_mutex) { _fftw_mutex = fftw_mutex; }
 
-void fftconv(const double *a, const size_t a_sz, const double *b,
-             const size_t b_sz, double *result, const size_t res_sz) {
+void convolve_fftw(const double *a, const size_t a_sz, const double *b,
+                   const size_t b_sz, double *result, const size_t res_sz) {
   // length of the real arrays, including the final convolution output
   const size_t padded_length = a_sz + b_sz - 1;
 
@@ -197,8 +197,9 @@ void fftconv(const double *a, const size_t a_sz, const double *b,
 }
 
 // reference implementation of fftconv with no optimizations
-void fftconv_ref(const double *a, const size_t a_sz, const double *b,
-                 const size_t b_sz, double *result, const size_t result_sz) {
+void convolve_fftw_ref(const double *a, const size_t a_sz, const double *b,
+                       const size_t b_sz, double *result,
+                       const size_t result_sz) {
   // length of the real arrays, including the final convolution output
   const size_t padded_length = a_sz + b_sz - 1;
   // length of the complex arrays
@@ -264,8 +265,8 @@ void fftconv_ref(const double *a, const size_t a_sz, const double *b,
 // 1. Split x into blocks of step_size.
 // 2. convolve with kernel b using fft of length N.
 // 3. add blocks together
-void fftconv_oa(const double *x, const size_t x_sz, const double *h,
-                const size_t h_sz, double *y, const size_t y_sz) {
+void oaconvolve_fftw(const double *x, const size_t x_sz, const double *h,
+                     const size_t h_sz, double *y, const size_t y_sz) {
 
   // const size_t N = 8 * nextpow2(h_size); // size for each fft
   const size_t N = get_optimal_fft_size(h_sz); // more optimal size for each fft
@@ -284,7 +285,7 @@ void fftconv_oa(const double *x, const size_t x_sz, const double *h,
     plan->forward_a();
     plan->complex_multiply_to_a();
     plan->backward();
-    // plan->normalize(); // either normalize here or later in the copy loop
+    // plan->normalize(); // normalize later in the copy loop
 
     // normalize output and add to result
     len = std::min(y_sz - pos, N);

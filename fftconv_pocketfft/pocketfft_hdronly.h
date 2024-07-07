@@ -3434,7 +3434,7 @@ template<typename T> void r2c(const shape_t &shape_in,
   size_t nthreads=1)
   {
   if (util::prod(shape_in)==0) return;
-  util::sanity_check(shape_in, stride_in, stride_out, false, axis);
+  //util::sanity_check(shape_in, stride_in, stride_out, false, axis);
   cndarr<T> ain(data_in, shape_in, stride_in);
   shape_t shape_out(shape_in);
   shape_out[axis] = shape_in[axis]/2 + 1;
@@ -3466,7 +3466,7 @@ template<typename T> void c2r(const shape_t &shape_out,
   size_t nthreads=1)
   {
   if (util::prod(shape_out)==0) return;
-  util::sanity_check(shape_out, stride_in, stride_out, false, axis);
+  //util::sanity_check(shape_out, stride_in, stride_out, false, axis);
   shape_t shape_in(shape_out);
   shape_in[axis] = shape_out[axis]/2 + 1;
   cndarr<cmplx<T>> ain(data_in, shape_in, stride_in);
