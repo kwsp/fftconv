@@ -2,7 +2,7 @@
   "version": 3,
   "cmakeMinimumRequired": {
     "major": 3,
-    "minor": 20,
+    "minor": 25,
     "patch": 0
   },
   "configurePresets": [
@@ -10,7 +10,6 @@
       "name": "base",
       "hidden": true,
       "binaryDir": "build/${presetName}",
-      "installDir": "install/${presetName}",
       "toolchainFile": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
     },
     {
@@ -42,8 +41,8 @@
       },
       "generator": "Visual Studio 17 2022",
       "cacheVariables": {
-        "CMAKE_CXX_FLAGS": "/arch:AVX2",
-        "CMAKE_C_FLAGS": "/arch:AVX2"
+        "CMAKE_CXX_FLAGS": "/arch:AVX2 /EHsc /Qvec-report:2",
+        "CMAKE_C_FLAGS": "/arch:AVX2 /EHsc /Qvec-report:2"
       }
     },
     {
@@ -54,7 +53,7 @@
       "cacheVariables": {
         "CMAKE_C_COMPILER": "clang",
         "CMAKE_CXX_COMPILER": "clang++",
-        "CMAKE_EXPORT_COMPILE_COMMANDS": "YES",
+        "CMAKE_CXX_FLAGS": "-Rpass=loop-vectorize -Rpass-missed=loop-vectorize -Rpass-analysis=loop-vectorize",
         "CMAKE_CXX_CLANG_TIDY": "clang-tidy;--format-style=file"
       }
     },
@@ -67,18 +66,16 @@
       }
     },
     {
-      "name": "clang-release",
-      "displayName": "Clang Release",
+      "name": "clang-relwithdebinfo",
+      "displayName": "Clang RelWithDebInfo",
       "inherits": "clang",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release",
-        "CMAKE_C_FLAGS_RELEASE": "${CMAKE_C_FLAGS_RELEASE} -g",
-        "CMAKE_CXX_FLAGS_RELEASE": "${CMAKE_CXX_FLAGS_RELEASE} -g"
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo"
       }
     },
     {
-      "name": "clang-dist",
-      "displayName": "Clang Dist",
+      "name": "clang-release",
+      "displayName": "Clang Release",
       "inherits": "clang",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release"
@@ -90,6 +87,11 @@
       "name": "Win64 Release",
       "configurePreset": "win64",
       "configuration": "Release"
+    },
+    {
+      "name": "Win64 RelWithDebInfo",
+      "configurePreset": "win64",
+      "configuration": "RelWithDebInfo"
     },
     {
       "name": "Win64 Debug",
