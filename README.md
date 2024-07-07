@@ -15,9 +15,9 @@ Python bindings are provided through Cython.
 
 **C++**
 
-`fftconv` is header only, so just include the header with `#include "fftconv.h"`. However, you need to have `fftw3` installed, with the `fftw3.h` header visible to the compiler and `libfftw3` visible to the linker.
+You must have `fftw3` installed, with the `fftw3.h` header visible to the compiler and `libfftw3` visible to the linker.
 
-To run the test and benchmark, you need to install the [Armadillo library](http://arma.sourceforge.net/) (benchmarked against).
+To run the test and benchmark, you also need to install the [Armadillo library](http://arma.sourceforge.net/) (benchmarked against).
 
 ```
 make       # build the test/benchmark
@@ -26,10 +26,10 @@ make test  # run the test/benchmark
 
 **Python**
 
-A Cython wrapper is provided. Similar to C++, make sure `fftw3` is installed and visible to the compiler on your system. Install Cython, then run 
+A Cython wrapper is provided. Similar to C++, make sure `fftw3` is installed and visible to the compiler on your system. Install Cython, numpy and scipy (benchmarked against), then run 
 
 ```
-python3 setup.py build_ext -i   # build extension
+python3 setup.py build_ext -i   # or `make python` to build extension
 python3 test.py                 # run the test/benchmark
 ```
 
@@ -37,7 +37,7 @@ python3 test.py                 # run the test/benchmark
 
 CPU: Apple M1
 
-**C++**. 1D convolution in `fftconv` is more than 2x faster than the Armadillo implementation.
+**C++**.
 
 ```
 % make test
@@ -74,7 +74,7 @@ gt vs fftconv_oa Vectors are equal.
     (5000 runs) arma_conv took 284ms
 ```
 
-**Python**. 1D convolution with `fftconv` is more than 2x faster than Numpy, and the speed gains are more significant the large the input arrays.
+**Python**.
 
 ```
 % python3 test.py
