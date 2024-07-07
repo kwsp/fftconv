@@ -158,7 +158,9 @@ public:
       -> fftw_buffer & = delete;                            // Copy assignment
   auto operator=(fftw_buffer &&) -> fftw_buffer & = delete; // Move assignment
 
-  explicit fftw_buffer(size_t size) : m_size(size), m_data(fftw_alloc(size)) {}
+  explicit fftw_buffer(size_t size) : m_size(size), m_data(fftw_alloc(size)) {
+    std::memset(m_data, 0, sizeof(T) * m_size);
+  }
 
   fftw_buffer(std::initializer_list<T> list) : fftw_buffer(list.size()) {
     std::copy(list.begin(), list.end(), this->begin());
@@ -212,7 +214,7 @@ private:
   }
 
   T *m_data;
-  size_t m_size{};
+  size_t m_size;
 };
 
 template <FloatOrDouble> struct fftw_plans_traits {};
