@@ -7,13 +7,10 @@
 #include <shared_mutex>
 #include <unordered_map>
 
-using std::array;
-using std::vector;
-
-static int nextpow2(int x) { return 1 << (int)(std::log2(x) + 1); }
+// static int nextpow2(int x) { return 1 << (int)(std::log2(x) + 1); }
 
 // Lookup table of {max_filter_size, optimal_fft_size}
-static const std::array<std::array<size_t, 2>, 9> _optimal_fft_size{
+static constexpr std::array<std::array<size_t, 2>, 9> _optimal_fft_size{
     {{7, 16},
      {12, 32},
      {21, 64},
@@ -27,7 +24,7 @@ static const std::array<std::array<size_t, 2>, 9> _optimal_fft_size{
 
 // Given a filter_size, return the optimal fft size for the overlap-add
 // convolution method
-static size_t get_optimal_fft_size(size_t filter_size) {
+static size_t get_optimal_fft_size(const size_t filter_size) {
   for (const auto &pair : _optimal_fft_size)
     if (filter_size < pair[0])
       return pair[1];
@@ -44,64 +41,69 @@ static inline void _copy_to_padded_buffer(const T *src, const size_t src_size,
   std::fill(dst + src_size, dst + dst_size, 0);
 }
 
-static void elementwise_multiply(const fftw_complex *a, const fftw_complex *b,
-                                 const size_t length, fftw_complex *result) {
-  for (auto i = 0; i < length; ++i) {
-    std::complex<double> _a(a[i][0], a[i][1]);
-    std::complex<double> _b(b[i][0], b[i][1]);
-    _a *= _b;
-    result[i][0] = _a.real();
-    result[i][1] = _a.imag();
+static inline void elementwise_multiply(const fftw_complex *a,
+                                        const fftw_complex *b,
+                                        const size_t length,
+                                        fftw_complex *result) {
+  // fftw_complex in C89 mode is double[2], which is binary compatible with C99's <complex.h>
+  // and C++'s complex<double> template class
+  // http://www.fftw.org/doc/Complex-numbers.html
+  const auto _a = reinterpret_cast<const std::complex<double> *>(a);
+  const auto _b = reinterpret_cast<const std::complex<double> *>(b);
+  auto _res = reinterpret_cast<std::complex<double> *>(result);
+
+  for (size_t i = 0; i < length; ++i) {
+    _res[i] = _a[i] * _b[i];
   }
 }
 
-enum class fft_direction { Forward = 0b01, Backward = 0b10 };
+// enum class fft_direction { Forward = 0b01, Backward = 0b10 };
 
-struct fft_plan {
-  fftw_plan plan;
-  double *real_buf;
-  fftw_complex *complex_buf;
+// struct fft_plan {
+// fftw_plan plan;
+// double *real_buf;
+// fftw_complex *complex_buf;
 
-  // Padded length must be an even power of 2
-  // The lowest 2 bits are used as direction flags
-  fft_plan(size_t padded_length) {
-    // length of the complex arrays
-    size_t complex_length = padded_length / 2 + 1;
-    real_buf = (double *)fftw_alloc_real(padded_length);
-    complex_buf = (fftw_complex *)fftw_alloc_complex(complex_length);
+//// Padded length must be an even power of 2
+//// The lowest 2 bits are used as direction flags
+// fft_plan(size_t padded_length) {
+//// length of the complex arrays
+// size_t complex_length = padded_length / 2 + 1;
+// real_buf = (double *)fftw_alloc_real(padded_length);
+// complex_buf = (fftw_complex *)fftw_alloc_complex(complex_length);
 
-    // Check direction
-    if ((int)padded_length & (int)fft_direction::Forward)
-      plan = fftw_plan_dft_r2c_1d(padded_length, real_buf, complex_buf,
-                                  FFTW_ESTIMATE);
-    else
-      plan = fftw_plan_dft_c2r_1d(padded_length, complex_buf, real_buf,
-                                  FFTW_ESTIMATE);
-  }
+//// Check direction
+// if ((int)padded_length & (int)fft_direction::Forward)
+// plan = fftw_plan_dft_r2c_1d(padded_length, real_buf, complex_buf,
+// FFTW_ESTIMATE);
+// else
+// plan = fftw_plan_dft_c2r_1d(padded_length, complex_buf, real_buf,
+// FFTW_ESTIMATE);
+//}
 
-  ~fft_plan() {
-    fftw_destroy_plan(plan);
-    fftw_free(real_buf);
-    fftw_free(complex_buf);
-  }
-};
+//~fft_plan() {
+// fftw_destroy_plan(plan);
+// fftw_free(real_buf);
+// fftw_free(complex_buf);
+//}
+//};
 
 // fftconv_plans manages the memory of the forward and backward fft plans
 // and the fftw buffers
 class fftconv_plans {
 public:
-  // FFTW plans
-  fftw_plan plan_f; // forward
-  fftw_plan plan_b; // backward
+  // FFTW buffer sizes
+  const size_t real_sz;
+  const size_t complex_sz;
 
   // FFTW buffers corresponding to the above plans
   double *real_buf;
   fftw_complex *complex_buf_a;
   fftw_complex *complex_buf_b;
 
-  // FFTW buffer sizes
-  const size_t real_sz;
-  const size_t complex_sz;
+  // FFTW plans
+  fftw_plan plan_f; // forward
+  fftw_plan plan_b; // backward
 
 public:
   // Constructors
@@ -116,11 +118,11 @@ public:
 
   // Destructor
   ~fftconv_plans() {
-
+    fftw_free(real_buf);
+    fftw_free(complex_buf_a);
+    fftw_free(complex_buf_b);
     fftw_destroy_plan(plan_f);
     fftw_destroy_plan(plan_b);
-
-    fftw_free(real_buf); // real_buf is the only fftw_malloc
   }
 
   void set_real_buf(const double *inp, size_t sz) {
@@ -137,8 +139,8 @@ public:
       real_buf[i] /= real_sz;
   }
 
+  // Complex element-wise multiply a and b, save results to a
   void complex_multiply_to_a() {
-    // A_buf becomes input to inverse conv
     elementwise_multiply(complex_buf_a, complex_buf_b, complex_sz,
                          complex_buf_a);
   }
@@ -158,19 +160,14 @@ public:
 
 // Compute the fftw plans and allocate buffers
 fftconv_plans::fftconv_plans(size_t padded_length)
-    : real_sz(padded_length), complex_sz(padded_length / 2 + 1) {
-  // Allocate buffers for the purposes of creating the plans...
-  real_buf = (double *)fftw_malloc(padded_length * sizeof(double) +
-                                   2 * complex_sz * sizeof(fftw_complex));
-  complex_buf_a = (fftw_complex *)(real_buf + padded_length);
-  complex_buf_b = complex_buf_a + complex_sz;
-
-  // Compute the plans
-  plan_f = fftw_plan_dft_r2c_1d(padded_length, real_buf, complex_buf_a,
-                                FFTW_ESTIMATE);
-  plan_b = fftw_plan_dft_c2r_1d(padded_length, complex_buf_a, real_buf,
-                                FFTW_ESTIMATE);
-}
+    : real_sz(padded_length), complex_sz(padded_length / 2 + 1),
+      real_buf(fftw_alloc_real(real_sz)),
+      complex_buf_a(fftw_alloc_complex(complex_sz)),
+      complex_buf_b(fftw_alloc_complex(complex_sz)),
+      plan_f(fftw_plan_dft_r2c_1d(padded_length, real_buf, complex_buf_a,
+                                  FFTW_ESTIMATE)),
+      plan_b(fftw_plan_dft_c2r_1d(padded_length, complex_buf_a, real_buf,
+                                  FFTW_ESTIMATE)) {}
 
 // In memory cache with key type K and value type V
 // V's constructor must take K as input
@@ -179,7 +176,6 @@ public:
   // Get a cached object if available.
   // Otherwise, a new one will be constructed.
   V *get(K key) {
-    // _cache is thread_local
     auto &val = _cache[key];
     if (val)
       return val.get();
@@ -195,7 +191,7 @@ private:
   std::unordered_map<K, std::unique_ptr<V>> _cache;
 };
 
-static thread_local Cache<size_t, fft_plan> fft_plan_cache;
+// static thread_local Cache<size_t, fft_plan> fft_plan_cache;
 static thread_local Cache<size_t, fftconv_plans> fftconv_plans_cache;
 
 namespace fftconv {
@@ -275,10 +271,10 @@ void convolve1d_ref(const double *a, const size_t a_size, const double *b,
   fftw_destroy_plan(plan_backward);
 }
 
-std::vector<double> convolve1d_ref(const vector<double> &a,
-                                   const vector<double> &b) {
+std::vector<double> convolve1d_ref(const std::vector<double> &a,
+                                   const std::vector<double> &b) {
   int padded_length = a.size() + b.size() - 1;
-  vector<double> result(padded_length);
+  std::vector<double> result(padded_length);
   convolve1d_ref(a.data(), a.size(), b.data(), b.size(), result.data());
   return result;
 }
@@ -286,7 +282,7 @@ std::vector<double> convolve1d_ref(const vector<double> &a,
 // Overlap-Add convolution of x and h with block length B
 //
 // x is a long signal
-// b is a kernel, x_size >> b_size
+// h is a kernel, x_size >> h_size
 // y is the results buffer. y_size >= x_size + b_size - 1
 //
 // B is the block size
@@ -297,9 +293,10 @@ std::vector<double> convolve1d_ref(const vector<double> &a,
 // 3. add blocks together
 void fftfilt(const double *x, const size_t x_size, const double *h,
              const size_t h_size, double *y, const size_t y_size) {
-  // Use overlap and add to convolve x and b
+
   // const size_t N = 8 * nextpow2(h_size); // size for each fft
-  const size_t N = get_optimal_fft_size(h_size); // size for each fft
+  const size_t N =
+      get_optimal_fft_size(h_size); // more optimal size for each fft
   const size_t step_size = N - (h_size - 1);
 
   // forward fft of b
