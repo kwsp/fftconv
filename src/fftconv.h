@@ -6,15 +6,13 @@
 #define __FFTCONV_H__
 
 #include <cassert>
-#include <complex>
-#include <cstring>
 #include <memory>
 #include <unordered_map>
 #include <vector>
 
 #include <fftw3.h>
 
-// vector wrapper for fftconv routines
+// std::vector wrapper for fftconv routines
 #define VECTOR_WRAPPER(CONV_FUNC)                                              \
   inline std::vector<double> CONV_FUNC(const std::vector<double> &x,           \
                                        const std::vector<double> &b) {         \
@@ -23,7 +21,7 @@
     return y;                                                                  \
   }
 
-// armadillo wrapper for fftconv routines
+// arma::vec wrapper for fftconv routines
 #ifdef ARMA_INCLUDES
 #define ARMA_WRAPPER(CONV_FUNC)                                                \
   inline arma::vec CONV_FUNC(const arma::vec &x, const arma::vec &b) {         \
@@ -48,7 +46,7 @@ void fftconv(const double *a, const size_t a_sz, const double *b,
 void fftconv_ref(const double *a, const size_t a_sz, const double *b,
                  const size_t b_sz, double *y, const size_t y_sz);
 
-// FFTconv with overlap-add method
+// 1D FFTconv with overlap-add method
 void fftconv_oa(const double *x, const size_t x_sz, const double *h,
                 const size_t h_sz, double *y, const size_t y_sz);
 
@@ -72,17 +70,14 @@ public:
   // Otherwise, a new one will be constructed.
   V *get(K key) {
     auto &val = _cache[key];
-    if (val)
-      return val.get();
-
-    val = std::make_unique<V>(key);
+    if (val == nullptr)
+      val = std::make_unique<V>(key);
     return val.get();
   }
 
   V *operator()(K key) { return get(key); }
 
 private:
-  // hash map cache to store fftw plans and buffers.
   std::unordered_map<K, std::unique_ptr<V>> _cache;
 };
 

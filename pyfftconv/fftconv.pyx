@@ -9,6 +9,9 @@ import numpy as np
 @cython.boundscheck(False)
 @cython.wraparound(False)
 def fftconv(double[:] x, double[:] h):
+    """
+    1D convolution using the FFT
+    """
 
     cdef:
         int x_size = x.size
@@ -26,6 +29,10 @@ def fftconv(double[:] x, double[:] h):
 @cython.boundscheck(False)
 @cython.wraparound(False)
 def fftconv_oa(double[:] x, double[:] h):
+    """
+    1D convolution using the overlap-add method. Extremely efficient
+    for FIR filtering where `x` is a long signal and `h` is the FIR kernel
+    """
 
     cdef:
         int x_size = x.size
