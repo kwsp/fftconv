@@ -1,15 +1,14 @@
-#include <cassert>
-#include <chrono>
 #include <cstdlib>
 #include <cstring>
 #include <functional>
 #include <iostream>
+#include <random>
 #include <string>
 #include <vector>
 
 #include <armadillo>
 
-#include "fftconv.hpp"        // fftw impl
+#include "fftconv.hpp" // fftw impl
 // #include "fftconv_pocket.hpp" // pocketfft impl
 #include "test_helpers.hpp"
 
@@ -45,7 +44,7 @@ void _test(const vector<double> &a, const vector<double> &b) {
   using namespace test_helpers;
   // Ground true
   auto gt = convolve_naive(a, b);
-  auto cmp = [&](const std::string &name, vector<double> res) {
+  auto cmp = [&](const std::string &name, const vector<double> &res) {
     if (!cmp_vec(gt, res)) {
       cout << "gt vs " << name << "\n";
       cout << "ground truth: ";
@@ -104,16 +103,20 @@ void _bench(const vector<double> &a, const vector<double> &b) {
 }
 
 // Run a test case
-void test_a_case(vector<double> a, vector<double> b) {
-  printf("=== test case (%llu, %llu) ===\n", a.size(), b.size());
+void test_a_case(const vector<double> &a, const vector<double> &b) {
+  printf("=== test case (%lu, %lu) ===\n", a.size(), b.size());
   _test(a, b);
   _bench(a, b);
 }
 
 static vector<double> get_vec(size_t size) {
+  std::random_device r;
+  std::default_random_engine e(r());
+  std::uniform_real_distribution<double> dist(-1, 1);
+
   vector<double> res(size);
   for (size_t i = 0; i < size; i++)
-    res[i] = (double)(std::rand() % 10);
+    res[i] = dist(e);
   return res;
 }
 
