@@ -34,39 +34,73 @@ CPU: Apple M1
 **C++**. 1D convolution in `fftconv` is more than 2x faster than the Armadillo implementation.
 
 ```
-./build/fftconv_test
+% make test
 === test case (1664, 65) ===
-Vectors are equal.
-Vectors are equal.
-    (5000 runs) ffconv::convolve1d took 49ms
+naive vs fft_ref Vectors are equal.
+naive vs fft Vectors are equal.
+naive vs fftfilt Vectors are equal.
+    (5000 runs) fftconv::convolve1d_ref took 207ms
+    (5000 runs) fftconv::convolve1d took 71ms
+    (5000 runs) fftconv::fftfilt took 57ms
     (5000 runs) arma::conv took 110ms
 === test case (2816, 65) ===
-Vectors are equal.
-Vectors are equal.
-    (5000 runs) ffconv::convolve1d took 86ms
-    (5000 runs) arma::conv took 183ms
-=== test case (2000, 2000) ===
-Vectors are equal.
-Vectors are equal.
-    (5000 runs) ffconv::convolve1d took 667ms
-    (5000 runs) arma::conv took 17440ms
+naive vs fft_ref Vectors are equal.
+naive vs fft Vectors are equal.
+naive vs fftfilt Vectors are equal.
+    (5000 runs) fftconv::convolve1d_ref took 247ms
+    (5000 runs) fftconv::convolve1d took 88ms
+    (5000 runs) fftconv::fftfilt took 96ms
+    (5000 runs) arma::conv took 182ms
+=== test case (2304, 65) ===
+naive vs fft_ref Vectors are equal.
+naive vs fft Vectors are equal.
+naive vs fftfilt Vectors are equal.
+    (5000 runs) fftconv::convolve1d_ref took 492ms
+    (5000 runs) fftconv::convolve1d took 265ms
+    (5000 runs) fftconv::fftfilt took 79ms
+    (5000 runs) arma::conv took 152ms
+=== test case (4352, 65) ===
+naive vs fft_ref Vectors are equal.
+naive vs fft Vectors are equal.
+naive vs fftfilt Vectors are equal.
+    (5000 runs) fftconv::convolve1d_ref took 483ms
+    (5000 runs) fftconv::convolve1d took 311ms
+    (5000 runs) fftconv::fftfilt took 148ms
+    (5000 runs) arma::conv took 281ms
 ```
 
 **Python**. 1D convolution with `fftconv` is more than 2x faster than Numpy, and the speed gains are more significant the large the input arrays.
 
 ```
+% python3 test.py
 === test case (1664, 65) ===
 Vectors are equal.
-    (5000 runs) fftconv took 56ms
-    (5000 runs) np.conv took 149ms
+    (5000 runs) fftconv took 70ms
+    (5000 runs) fftfilt took 64ms
+    (5000 runs) np.conv took 141ms
+    (5000 runs) scipy.signal.convolve took 158ms
+    (5000 runs) scipy.signal.fftconvolve took 194ms
 === test case (2816, 65) ===
 Vectors are equal.
-    (5000 runs) fftconv took 93ms
-    (5000 runs) np.conv took 247ms
-=== test case (2000, 2000) ===
+    (5000 runs) fftconv took 96ms
+    (5000 runs) fftfilt took 102ms
+    (5000 runs) np.conv took 232ms
+    (5000 runs) scipy.signal.convolve took 250ms
+    (5000 runs) scipy.signal.fftconvolve took 252ms
+=== test case (2304, 65) ===
 Vectors are equal.
-    (5000 runs) fftconv took 658ms
-    (5000 runs) np.conv took 8285ms
+    (5000 runs) fftconv took 270ms
+    (5000 runs) fftfilt took 85ms
+    (5000 runs) np.conv took 192ms
+    (5000 runs) scipy.signal.convolve took 210ms
+    (5000 runs) scipy.signal.fftconvolve took 235ms
+=== test case (4352, 65) ===
+Vectors are equal.
+    (5000 runs) fftconv took 319ms
+    (5000 runs) fftfilt took 157ms
+    (5000 runs) np.conv took 375ms
+    (5000 runs) scipy.signal.convolve took 378ms
+    (5000 runs) scipy.signal.fftconvolve took 356ms
 ```
 
 The Python wrapper is almost as fast as the C++ code, as it has very little overhead.

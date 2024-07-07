@@ -159,6 +159,7 @@ int main() {
   // test_a_case({0, 1, 2, 3, 4, 5, 6, 7}, {0, 1, 2, 3});
   test_a_case(get_vec(8), get_vec(4));
   test_a_case(get_vec(1664), get_vec(65));
+  test_a_case(get_vec(2816), get_vec(65));
   test_a_case(get_vec(2304), get_vec(65));
   test_a_case(get_vec(4352), get_vec(65));
   // test_a_case(get_vec(2000), get_vec(2000));
