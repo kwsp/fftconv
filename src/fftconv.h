@@ -22,16 +22,16 @@
     return y;                                                                  \
   }
 
-//// armadillo wrapper for fftconv routines
-//#ifdef ARMA_INCLUDES
-//  #define ARMA_WRAPPER(CONV_FUNC) \
-  //inline arma::vec CONV_FUNC(const arma::vec &x, const arma::vec &b) { \
-    //arma::vec y(b.size() + x.size() - 1);                                      \
-    //CONV_FUNC(x.memptr(), x.size(), b.memptr(), b.size(), y.memptr(),          \
-              //y.size());                                                       \
-    //return y;                                                                  \
-  //}
-//#endif
+// armadillo wrapper for fftconv routines
+#ifdef ARMA_INCLUDES
+  #define ARMA_WRAPPER(CONV_FUNC) \
+  inline arma::vec CONV_FUNC(const arma::vec &x, const arma::vec &b) { \
+    arma::vec y(b.size() + x.size() - 1);                                      \
+    CONV_FUNC(x.memptr(), x.size(), b.memptr(), b.size(), y.memptr(),          \
+              y.size());                                                       \
+    return y;                                                                  \
+  }
+#endif
 
 namespace fftconv {
 
@@ -56,11 +56,12 @@ VECTOR_WRAPPER(fftconv)
 VECTOR_WRAPPER(fftconv_ref)
 VECTOR_WRAPPER(fftconv_oa)
 
-//#ifdef ARMA_WRAPPER
-// ARMA_WRAPPER(fftconv)
-// ARMA_WRAPPER(fftconv_ref)
-// ARMA_WRAPPER(fftconv_oa)
-//#endif
+// arma::vec interface
+#ifdef ARMA_WRAPPER
+ ARMA_WRAPPER(fftconv)
+ ARMA_WRAPPER(fftconv_ref)
+ ARMA_WRAPPER(fftconv_oa)
+#endif
 
 // In memory cache with key type K and value type V
 // V's constructor must take K as input
@@ -86,9 +87,9 @@ private:
 
 } // namespace fftconv
 
-//#ifdef ARMA_WRAPPER
-//#undef ARMA_WRAPPER
-//#endif
+#ifdef ARMA_WRAPPER
+#undef ARMA_WRAPPER
+#endif
 
 #undef VECTOR_WRAPPER
 
