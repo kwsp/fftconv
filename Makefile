@@ -4,7 +4,7 @@ BUILD_DIR := ./build
 SRC_DIRS := ./
 SRCS := test.cpp
 OBJS := $(SRCS:%=$(BUILD_DIR)/%.o)
-LDFLAGS := -lfftw3 -L/opt/homebrew/lib -lomp -larmadillo
+LDFLAGS := -lfftw3 -L/opt/homebrew/lib -larmadillo
 
 # Every folder in ./src will need to be passed to GCC so that it can find header files
 INC_DIRS := include
