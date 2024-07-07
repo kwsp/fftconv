@@ -16,22 +16,17 @@ from timeit import timeit
 
 N_RUNS = 5000
 
+def _timeit(name, callable):
+    elapsed_ms = 1000 * timeit(
+        callable,
+        number=N_RUNS,
+    )
+    print(f"    ({N_RUNS} runs) {name} took {round(elapsed_ms)}ms")
+
 
 def run_bench(x, y):
-    _globals = {**globals(), "x": x, "y": y}
-    fftconv_time = timeit(
-        "convolve1d(x, x.size, y, y.size)",
-        globals=_globals,
-        number=N_RUNS,
-    )
-    print(f"    ({N_RUNS} runs) fftconv: {fftconv_time * 1000:.2f} ms")
-
-    npconv_time = timeit(
-        "np.convolve(x, y)",
-        globals=_globals,
-        number=N_RUNS,
-    )
-    print(f"    ({N_RUNS} runs) np.conv: {npconv_time * 1000:.2f} ms")
+    _timeit("fftconv", lambda: convolve1d(x, x.size, y, y.size))
+    _timeit("np.conv", lambda: np.convolve(x, y))
 
 
 def run_test_case(x, y):
