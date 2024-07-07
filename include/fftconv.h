@@ -208,21 +208,21 @@ inline void convolve1d(const double *a, const size_t a_size, const double *b,
   // Get cached plans
   auto plans = FFTW_PLAN_STORE::get(padded_length);
 
-  // Allocate fftw buffers for a
-  // double *real_buf = fftw_alloc_real(padded_length);
-  // fftw_complex *complex_buf_a = fftw_alloc_complex(complex_length);
-  double *const real_buf = plans->real_buf;
-  fftw_complex *const complex_buf_a = plans->complex_buf_a;
-  fftw_complex *const complex_buf_b = plans->complex_buf_b;
+
+  // Allocate fftw buffers
+  double *real_buf = fftw_alloc_real(padded_length);
+  fftw_complex *complex_buf_a = fftw_alloc_complex(complex_length);
+  fftw_complex *complex_buf_b = fftw_alloc_complex(complex_length);
+
+  //double *const real_buf = plans->real_buf;
+  //fftw_complex *const complex_buf_a = plans->complex_buf_a;
+  //fftw_complex *const complex_buf_b = plans->complex_buf_b;
 
   // Copy a to buffer
   _copy_to_padded_buffer(a, a_size, real_buf, padded_length);
 
   // Compute Fourier transform of vector a
   fftw_execute_dft_r2c(plans->forward, real_buf, complex_buf_a);
-
-  // Allocate fftw buffers for b
-  // fftw_complex *complex_buf_b = fftw_alloc_complex(complex_length);
 
   // Copy b to buffer. Reuse real buffer
   _copy_to_padded_buffer(b, b_size, real_buf, padded_length);
@@ -247,9 +247,9 @@ inline void convolve1d(const double *a, const size_t a_size, const double *b,
     result[i] = real_buf[i] / padded_length;
   }
 
-  // fftw_free(real_buf);
-  // fftw_free(complex_buf_a);
-  // fftw_free(complex_buf_b);
+  fftw_free(real_buf);
+  fftw_free(complex_buf_a);
+  fftw_free(complex_buf_b);
 }
 
 inline vector<double> convolve1d(const vector<double> &a,
