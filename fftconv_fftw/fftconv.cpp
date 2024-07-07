@@ -1,14 +1,14 @@
-// Author: Tiger Nie
+// Author: Taylor Nie
 // 2022
 // https://github.com/kwsp/fftconv
 
-#include "fftconv.hpp"
 #include <algorithm>
 #include <array>
 #include <complex>
 #include <cstring>
-#include <debug_utils.hpp>
 #include <sys/types.h>
+
+#include "fftconv.hpp"
 
 std::mutex *_fftw_mutex = nullptr;
 
@@ -225,7 +225,7 @@ struct fftconv_plans_advanced {
   fftw_plan plan_backward_signal;
 
   // void debug_print() {
-  //#define PRINT(NAME) std::cout << #NAME << " (" << NAME << ") "
+  // #define PRINT(NAME) std::cout << #NAME << " (" << NAME << ") "
   // PRINT(real_sz);
   // PRINT(complex_sz);
   // PRINT(howmany);

@@ -7,10 +7,10 @@
 #include <string>
 #include <vector>
 
-#include "fftconv.hpp"        // fftw impl
-#include "fftconv_pocket.hpp" // pocketfft impl
 #include <armadillo>
 
+#include "fftconv.hpp"        // fftw impl
+// #include "fftconv_pocket.hpp" // pocketfft impl
 #include "test_helpers.hpp"
 
 using std::cout;
@@ -66,10 +66,10 @@ void _test(const vector<double> &a, const vector<double> &b) {
   CMP(oaconvolve_fftw);
   CMP(oaconvolve_fftw_advanced);
 
-  CMP(convolve_pocketfft);
-  CMP(oaconvolve_pocketfft);
-  CMP(convolve_pocketfft_hdr);
-  CMP(oaconvolve_pocketfft_hdr);
+  // CMP(convolve_pocketfft);
+  // CMP(oaconvolve_pocketfft);
+  // CMP(convolve_pocketfft_hdr);
+  // CMP(oaconvolve_pocketfft_hdr);
 
   if (res)
     cout << "All tests passed.\n";
@@ -95,16 +95,17 @@ void _bench(const vector<double> &a, const vector<double> &b) {
   TIMEIT(oaconvolve_fftw, a, b);
   TIMEIT(oaconvolve_fftw_advanced, a, b);
 
-  TIMEIT(convolve_pocketfft, a, b);
-  TIMEIT(oaconvolve_pocketfft, a, b);
-  TIMEIT(convolve_pocketfft_hdr, a, b);
-  TIMEIT(oaconvolve_pocketfft_hdr, a, b);
+  // TIMEIT(convolve_pocketfft, a, b);
+  // TIMEIT(oaconvolve_pocketfft, a, b);
+  // TIMEIT(convolve_pocketfft_hdr, a, b);
+  // TIMEIT(oaconvolve_pocketfft_hdr, a, b);
+
   TIMEIT(convolve_armadillo, arma_a, arma_b);
 }
 
 // Run a test case
 void test_a_case(vector<double> a, vector<double> b) {
-  printf("=== test case (%lu, %lu) ===\n", a.size(), b.size());
+  printf("=== test case (%llu, %llu) ===\n", a.size(), b.size());
   _test(a, b);
   _bench(a, b);
 }

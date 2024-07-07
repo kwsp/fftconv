@@ -1,0 +1,80 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 20,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "vs-2022-debug",
+      "displayName": "Visual Studio 2022 Debug",
+      "generator": "Visual Studio 17 2022",
+      "architecture": {
+        "value": "x64",
+        "strategy": "external"
+      },
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      },
+      "toolchainFile": "C:/src/vcpkg/scripts/buildsystems/vcpkg.cmake"
+    },
+    {
+      "name": "vs-2022-release",
+      "displayName": "Visual Studio 2022 Release",
+      "generator": "Visual Studio 17 2022",
+      "architecture": {
+        "value": "x64",
+        "strategy": "external"
+      },
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebugInfo"
+      },
+      "toolchainFile": "C:/src/vcpkg/scripts/buildsystems/vcpkg.cmake"
+    },
+    {
+      "name": "clang-debug",
+      "displayName": "Clang Debug",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_C_COMPILER": "clang",
+        "CMAKE_CXX_COMPILER": "clang++"
+      },
+      "toolchainFile": "C:/src/vcpkg/scripts/buildsystems/vcpkg.cmake"
+    },
+    {
+      "name": "clang-release",
+      "displayName": "Clang Release",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_C_COMPILER": "clang",
+        "CMAKE_CXX_COMPILER": "clang++"
+      },
+      "toolchainFile": "C:/src/vcpkg/scripts/buildsystems/vcpkg.cmake"
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "vs-2022-debug-build",
+      "configurePreset": "vs-2022-debug"
+    },
+    {
+      "name": "vs-2022-release-build",
+      "configurePreset": "vs-2022-release"
+    },
+    {
+      "name": "clang-debug-build",
+      "configurePreset": "clang-debug"
+    },
+    {
+      "name": "clang-release-build",
+      "configurePreset": "clang-release"
+    }
+  ]
+}

@@ -1,14 +1,7 @@
-// Author: Tiger Nie
+// Author: Taylor Nie
 // 2022
 // https://github.com/kwsp/fftconv
 #pragma once
-
-#define POCKETFFT_NO_MULTITHREADING
-
-#include <pocketfft_hdronly.h>
-extern "C" {
-#include <pocketfft.h>
-}
 
 #include <cassert>
 #include <complex>
@@ -17,7 +10,12 @@ extern "C" {
 #include <unordered_map>
 #include <vector>
 
-#include "debug_utils.hpp"
+#define POCKETFFT_NO_MULTITHREADING
+#include <pocketfft_hdronly.h>
+extern "C" {
+#include <pocketfft.h>
+}
+// #include "debug_utils.hpp"
 
 // Lookup table of {max_filter_size, optimal_fft_size}
 static constexpr std::array<std::array<size_t, 2>, 9> _optimal_fft_size{
