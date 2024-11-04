@@ -1,9 +1,11 @@
+#include <armadillo>
 #include <benchmark/benchmark.h>
+#include <kfr/all.hpp>
+#include <kfr/base/univector.hpp>
 #include <span>
 
 #include "fftconv.hpp"
 // #include "fftconv_pocket.hpp"
-#include <armadillo>
 
 using std::vector;
 
@@ -39,6 +41,19 @@ void conv_bench_full(benchmark::State &state, Func conv_func) {
   for (auto _ : state) {
     conv_func(vec1, vec2, res);
   }
+}
+
+template <fftconv::FloatOrDouble Real>
+void kfr_conv(const std::span<const Real> span1,
+              const std::span<const Real> span2, std::span<Real> span_res) {
+
+  auto inData = kfr::make_univector(span1.data(), span1.size());
+  auto taps = kfr::make_univector(span2.data(), span2.size());
+  auto res = kfr::make_univector(span_res.data(), span_res.size());
+
+  kfr::filter_fir<Real> filter(taps);
+  // kfr::convolve_filter<T> filter(taps);
+  filter.apply(res, inData);
 }
 
 // Wrapper to prevent arma::conv from being optimized away
@@ -109,10 +124,12 @@ void BM_arma_conv_same(benchmark::State &state) {
 BENCHMARK(BM_arma_conv_same<double>)->ArgsProduct(args);
 BENCHMARK(BM_arma_conv_same<float>)->ArgsProduct(args);
 
-// REGISTER(convolve_pocketfft)
-// REGISTER(oaconvolve_pocketfft)
-// REGISTER(convolve_pocketfft_hdr)
-// REGISTER(oaconvolve_pocketfft_hdr)
+template <fftconv::FloatOrDouble Real>
+void BM_kfr_conv_same(benchmark::State &state) {
+  conv_bench_same<Real>(state, kfr_conv<Real>);
+}
+BENCHMARK(BM_kfr_conv_same<double>)->ArgsProduct(args);
+BENCHMARK(BM_kfr_conv_same<float>)->ArgsProduct(args);
 
 // NOLINTEND(*-identifier-length)
 

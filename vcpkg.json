@@ -3,6 +3,7 @@
   "name": "fftconv",
   "version": "0.2.1",
   "dependencies": [
+    "fmt",
     "armadillo",
     "benchmark",
     "gtest",
@@ -14,7 +15,8 @@
     {
       "name": "fftw3",
       "platform": "!x64"
-    }
+    },
+    "kfr"
   ],
   "builtin-baseline": "43d81795a513e2ca6648354786178714f33c8b6f"
 }

@@ -5,18 +5,29 @@ enable_testing()
 
 find_package(Armadillo CONFIG)
 find_package(GTest CONFIG REQUIRED)
+find_package(KFR CONFIG REQUIRED)
+find_package(fmt CONFIG REQUIRED)
 
 
 add_executable(test_script_fftconv)
+set_target_properties(test_script_fftconv PROPERTIES
+    CXX_STANDARD 20
+    CXX_EXTENSIONS OFF
+)
 target_sources(test_script_fftconv
     PRIVATE
     test_script.cpp
 )
 target_link_libraries(test_script_fftconv
     PRIVATE
+    fmt::fmt
     armadillo
     fftconv
     fftconv_pocket
+    kfr
+    kfr_io
+    kfr_dsp
+    kfr_dsp_neon64
 )
 
 

@@ -2,7 +2,7 @@
 #include <cassert>
 #include <cstdio>
 #include <cstdlib>
-#include <iomanip>
+#include <fmt/core.h>
 #include <span>
 
 constexpr double Tol = 1e-6;
@@ -11,14 +11,13 @@ constexpr double Tol = 1e-6;
 inline void timeit(const std::string &name,
                    const std::function<void()> &callable, int n_runs) {
   using namespace std::chrono; // NOLINT
-  std::cout << "    (" << n_runs << " runs) " << name;
-  auto start = high_resolution_clock::now();
+  const auto start = high_resolution_clock::now();
   for (int i = 0; i < n_runs; i++) {
     callable();
   }
-  auto elapsed =
+  const auto elapsed =
       duration_cast<milliseconds>(high_resolution_clock::now() - start);
-  std::cout << " took " << elapsed.count() << "ms\n";
+  fmt::println("    ({} runs) {} took {}ms", n_runs, name, elapsed.count());
 }
 
 // Compare two vectors
@@ -34,11 +33,4 @@ auto cmp_vec(const std::span<const T1> vec1, const std::span<const T2> vec2)
     }
   }
   return true;
-}
-
-template <class T> void print_vec(const std::span<const T> arr) {
-  for (int i = 0; i < arr.size(); ++i) {
-    std::cout << std::setw(4) << arr[i] << ", ";
-  }
-  std::cout << "\n";
 }

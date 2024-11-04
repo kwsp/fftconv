@@ -4,6 +4,7 @@ set(CMAKE_CXX_STANDARD 20)
 
 find_package(BENCHMARK CONFIG REQUIRED)
 find_package(Armadillo CONFIG REQUIRED)
+find_package(KFR CONFIG REQUIRED)
 
 add_executable(bench_fftconv)
 target_sources(bench_fftconv
@@ -18,4 +19,6 @@ target_link_libraries(bench_fftconv
     benchmark::benchmark
     benchmark::benchmark_main
     armadillo
+    kfr
+    kfr_dsp
 )
