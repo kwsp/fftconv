@@ -13,90 +13,157 @@
       "toolchainFile": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
     },
     {
-      "name": "debug",
-      "inherits": "base",
-      "displayName": "Debug",
-      "description": "Debug build with no special settings",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug"
-      }
-    },
-    {
-      "name": "release",
-      "inherits": "base",
-      "displayName": "Release",
-      "description": "Release build with no special settings",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release"
-      }
-    },
-    {
-      "name": "win64",
-      "displayName": "Win64 (Visual Studio 2022)",
+      "name": "win64-cl-base",
+      "hidden": true,
       "inherits": "base",
       "condition": {
         "type": "equals",
         "lhs": "${hostSystemName}",
         "rhs": "Windows"
       },
-      "generator": "Visual Studio 17 2022",
+      "architecture": {
+        "value": "x64",
+        "strategy": "external"
+      },
       "cacheVariables": {
-        "CMAKE_CXX_FLAGS": "/arch:AVX2 /EHsc /Qvec-report:2",
-        "CMAKE_C_FLAGS": "/arch:AVX2 /EHsc /Qvec-report:2"
+        "CMAKE_C_COMPILER": "cl.exe",
+        "CMAKE_CXX_COMPILER": "cl.exe",
+        "CMAKE_C_FLAGS": "/EHsc /arch:AVX2",
+        "CMAKE_CXX_FLAGS": "/EHsc /arch:AVX2"
       }
+    },
+    {
+      "name": "win64",
+      "displayName": "Visual Studio 2022",
+      "description": "Visual Studio 2022 + x64 CL",
+      "inherits": "win64-cl-base",
+      "generator": "Visual Studio 17 2022"
     },
     {
       "name": "clang",
-      "hidden": true,
       "inherits": "base",
-      "generator": "Ninja",
+      "displayName": "Clang",
+      "description": "Ninja Multi-Config + Clang",
+      "generator": "Ninja Multi-Config",
       "cacheVariables": {
         "CMAKE_C_COMPILER": "clang",
-        "CMAKE_CXX_COMPILER": "clang++",
-        "CMAKE_CXX_FLAGS": "-Rpass=loop-vectorize -Rpass-missed=loop-vectorize -Rpass-analysis=loop-vectorize",
-        "CMAKE_CXX_CLANG_TIDY": "clang-tidy;--format-style=file"
+        "CMAKE_CXX_COMPILER": "clang++"
       }
     },
     {
-      "name": "clang-debug",
-      "displayName": "Clang Debug",
+      "name": "clang-vec-report",
       "inherits": "clang",
+      "displayName": "Clang with vec report",
+      "description": "Ninja Multi-Config + Clang with autovectorizer report",
+      "generator": "Ninja Multi-Config",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug"
+        "CMAKE_CXX_FLAGS": "-Rpass=loop-vectorize -Rpass-missed=loop-vectorize -Rpass-analysis=loop-vectorize"
       }
     },
     {
-      "name": "clang-relwithdebinfo",
-      "displayName": "Clang RelWithDebInfo",
+      "name": "clang-asan",
       "inherits": "clang",
+      "displayName": "Clang with ASAN",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "RelWithDebInfo"
+        "CMAKE_C_FLAGS": "-fsanitize=address -fno-omit-frame-pointer",
+        "CMAKE_CXX_FLAGS": "-fsanitize=address -fno-omit-frame-pointer"
       }
     },
     {
-      "name": "clang-release",
-      "displayName": "Clang Release",
-      "inherits": "clang",
+      "name": "cl",
+      "inherits": "win64-cl-base",
+      "displayName": "CL",
+      "description": "Ninja Multi-Config + x64 MSVC",
+      "generator": "Ninja Multi-Config"
+    },
+    {
+      "name": "cl-vec-report",
+      "inherits": "cl",
+      "displayName": "CL (with vec report)",
+      "description": "Ninja Multi-Config + x64 MSVC (with autovectorizer report)",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release"
+        "CMAKE_CXX_FLAGS": "/Qvec-report:2"
       }
     }
   ],
   "buildPresets": [
     {
-      "name": "Win64 Release",
+      "name": "win64-release",
+      "displayName": "Win64 Release",
       "configurePreset": "win64",
       "configuration": "Release"
     },
     {
-      "name": "Win64 RelWithDebInfo",
+      "name": "win64-relwithdebinfo",
+      "displayName": "Win64 RelWithDebInfo",
       "configurePreset": "win64",
       "configuration": "RelWithDebInfo"
     },
     {
-      "name": "Win64 Debug",
+      "name": "win64-debug",
+      "displayName": "Win64 Debug",
       "configurePreset": "win64",
       "configuration": "Debug"
+    },
+    {
+      "name": "clang-debug",
+      "displayName": "Clang Debug",
+      "configurePreset": "clang",
+      "configuration": "Debug"
+    },
+    {
+      "name": "clang-relwithdebinfo",
+      "displayName": "Clang RelWithDebInfo",
+      "configurePreset": "clang",
+      "configuration": "RelWithDebInfo"
+    },
+    {
+      "name": "clang-release",
+      "displayName": "Clang Release",
+      "configurePreset": "clang",
+      "configuration": "Release"
+    },
+    {
+      "name": "clang-vec-report-release",
+      "displayName": "Clang Release",
+      "configurePreset": "clang-vec-report",
+      "configuration": "Release"
+    },
+    {
+      "name": "clang-asan-debug",
+      "displayName": "Clang ASan Debug",
+      "configurePreset": "clang-asan",
+      "configuration": "Debug"
+    },
+    {
+      "name": "clang-asan-relwithdebinfo",
+      "displayName": "Clang ASan RelWithDebInfo",
+      "configurePreset": "clang-asan",
+      "configuration": "RelWithDebInfo"
+    },
+    {
+      "name": "clang-asan-release",
+      "displayName": "Clang ASan Release",
+      "configurePreset": "clang-asan",
+      "configuration": "Release"
+    },
+    {
+      "name": "cl-debug",
+      "displayName": "CL Debug",
+      "configurePreset": "cl",
+      "configuration": "Debug"
+    },
+    {
+      "name": "cl-relwithdebinfo",
+      "displayName": "CL RelWithDebInfo",
+      "configurePreset": "cl",
+      "configuration": "RelWithDebInfo"
+    },
+    {
+      "name": "cl-release",
+      "displayName": "CL Release",
+      "configurePreset": "cl",
+      "configuration": "Release"
     }
   ]
 }
