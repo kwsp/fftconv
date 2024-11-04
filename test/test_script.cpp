@@ -21,8 +21,8 @@ void bench(const arma::Col<T> &vec1, const arma::Col<T> &vec2) {
   const std::span res(_res);
 
   timeit(
-      "convolve_fftw_ref", [&]() { fftconv::convolve_fftw_ref(v1s, v2s, res); },
-      N_RUNS);
+      "convolve_fftw_ref",
+      [&]() { fftconv::convolve_fftw_ref<double>(v1s, v2s, res); }, N_RUNS);
 
   timeit(
       "convolve_fftw", [&]() { fftconv::convolve_fftw(v1s, v2s, res); },
