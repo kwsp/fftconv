@@ -58,7 +58,7 @@ TEST(FFTWBuffer, AllocatesAndFreesMemoryCorrectly) {
   const size_t size = 128;
 
   {
-    fftconv::internal::fftw_buffer<double> buffer(size);
+    fftconv::fftw_buffer<double> buffer(size);
     EXPECT_NE(buffer.data(), nullptr);
     EXPECT_EQ(buffer.size(), size);
 
@@ -66,15 +66,16 @@ TEST(FFTWBuffer, AllocatesAndFreesMemoryCorrectly) {
     EXPECT_NO_THROW(buffer[size - 1] = 0.0);
   }
   {
-    fftconv::internal::fftw_buffer<float> buffer(size);
+    fftconv::fftw_buffer<float> buffer(size);
     EXPECT_NE(buffer.data(), nullptr);
     EXPECT_EQ(buffer.size(), size);
 
     // Verify can access last element without crash
     EXPECT_NO_THROW(buffer[size - 1] = 0.0);
   }
+
   {
-    fftconv::internal::fftw_buffer<fftw_complex> buffer(size);
+    fftconv::fftw_buffer<std::complex<double>> buffer(size);
     EXPECT_NE(buffer.data(), nullptr);
     EXPECT_EQ(buffer.size(), size);
 
@@ -83,7 +84,7 @@ TEST(FFTWBuffer, AllocatesAndFreesMemoryCorrectly) {
   }
 
   {
-    fftconv::internal::fftw_buffer<fftwf_complex> buffer(size);
+    fftconv::fftw_buffer<std::complex<double>> buffer(size);
     EXPECT_NE(buffer.data(), nullptr);
     EXPECT_EQ(buffer.size(), size);
 
@@ -97,7 +98,7 @@ TEST(FFTWBuffer, CorrectAllocationAndSize) {
   const auto sizes = std::to_array({16, 128, 1024, 2048});
 
   for (auto size : sizes) {
-    fftconv::internal::fftw_buffer<float> buffer(size);
+    fftconv::fftw_buffer<float> buffer(size);
     EXPECT_EQ(buffer.size(), size)
         << "Buffer size should match the requested size.";
     EXPECT_NE(buffer.data(), nullptr)
@@ -107,63 +108,52 @@ TEST(FFTWBuffer, CorrectAllocationAndSize) {
 
 TEST(ElementwiseMultiplyTest, CorrectMultiplication) {
   // Setup test data
-  fftconv::internal::fftw_buffer<fftw_complex> complex1(2);
-  complex1[0][0] = 1;
-  complex1[0][1] = 2;
-  complex1[1][0] = 3;
-  complex1[1][1] = 4;
+  fftconv::fftw_buffer<std::complex<double>> complex1{{{1, 2}, {3, 4}}};
 
-  fftconv::internal::fftw_buffer<fftw_complex> complex2(2);
-  complex2[0][0] = 5;
-  complex2[0][1] = 6;
-  complex2[1][0] = 7;
-  complex2[1][1] = 8;
+  fftconv::fftw_buffer<std::complex<double>> complex2{{{5, 6}, {7, 8}}};
 
-  fftconv::internal::fftw_buffer<fftw_complex> result(2);
+  fftconv::fftw_buffer<std::complex<double>> result(2);
 
   // Perform element-wise multiplication
-  fftconv::internal::elementwise_multiply(complex1.cspan(), complex2.cspan(),
-                                          result.span());
+  fftconv::internal::elementwise_multiply_cx<double>(complex1, complex2,
+                                                     result);
 
   // Verify the results
-  EXPECT_DOUBLE_EQ(result[0][0], -7);  // (1*5 - 2*6) = 5 - 12 = -7
-  EXPECT_DOUBLE_EQ(result[0][1], 16);  // (2*5 + 1*6) = 10 + 6 = 16
-  EXPECT_DOUBLE_EQ(result[1][0], -11); // (3*7 - 4*8) = 21 - 32 = -11
-  EXPECT_DOUBLE_EQ(result[1][1], 52);  // (4*7 + 3*8) = 28 + 24 = 52
+  EXPECT_DOUBLE_EQ(result[0].real(), -7);  // (1*5 - 2*6) = 5 - 12 = -7
+  EXPECT_DOUBLE_EQ(result[0].imag(), 16);  // (2*5 + 1*6) = 10 + 6 = 16
+  EXPECT_DOUBLE_EQ(result[1].real(), -11); // (3*7 - 4*8) = 21 - 32 = -11
+  EXPECT_DOUBLE_EQ(result[1].imag(), 52);  // (4*7 + 3*8) = 28 + 24 = 52
 }
 
 TEST(ElementwiseMultiplyTest, HandlesDifferentSizes) {
   // Setup test data
-  fftconv::internal::fftw_buffer<fftw_complex> complex1(3);
-  complex1[0][0] = 1;
-  complex1[0][1] = 1;
-  complex1[1][0] = 2;
-  complex1[1][1] = 2;
-  complex1[2][0] = 3;
-  complex1[2][1] = 3;
+  fftconv::fftw_buffer<std::complex<double>> complex1{{
+      {1, 1},
+      {2, 2},
+      {3, 3},
+  }};
 
-  fftconv::internal::fftw_buffer<fftw_complex> complex2(2);
-  complex2[0][0] = 1;
-  complex2[0][1] = -1;
-  complex2[1][0] = 1;
-  complex2[1][1] = -1;
+  fftconv::fftw_buffer<std::complex<double>> complex2{{
+      {1, -1},
+      {1, -1},
+  }};
 
-  fftconv::internal::fftw_buffer<fftw_complex> result(3);
+  fftconv::fftw_buffer<std::complex<double>> result(3);
 
   // Perform element-wise multiplication
-  fftconv::internal::elementwise_multiply(complex1.cspan(), complex2.cspan(),
-                                          result.span());
+  fftconv::internal::elementwise_multiply_cx<double>(complex1, complex2,
+                                                     result);
 
   // Only the first 2 elements should be computed
-  EXPECT_DOUBLE_EQ(result[0][0], 2);
-  EXPECT_DOUBLE_EQ(result[0][1], 0);
-  EXPECT_DOUBLE_EQ(result[1][0], 4);
-  EXPECT_DOUBLE_EQ(result[1][1], 0);
+  EXPECT_DOUBLE_EQ(result[0].real(), 2);
+  EXPECT_DOUBLE_EQ(result[0].imag(), 0);
+  EXPECT_DOUBLE_EQ(result[1].real(), 4);
+  EXPECT_DOUBLE_EQ(result[1].imag(), 0);
 
   // The third element of complex1 and result should not be computed (size
   // mismatch)
-  EXPECT_DOUBLE_EQ(result[2][0], 0);
-  EXPECT_DOUBLE_EQ(result[2][1], 0);
+  EXPECT_DOUBLE_EQ(result[2].real(), 0);
+  EXPECT_DOUBLE_EQ(result[2].imag(), 0);
 }
 
 // Test FFT plan creation
@@ -171,28 +161,28 @@ TEST(FFTPlans1D, CreatesPlansCorrectly) {
   const size_t size = 128;
 
   {
-    fftconv::internal::fftw_buffer<float> real(size);
-    fftconv::internal::fftw_buffer<fftwf_complex> complex(size / 2 + 1);
-    fftconv::internal::fftw_plans_1d<float> plans(real, complex);
-    EXPECT_NE(plans.plan_f, nullptr);
-    EXPECT_NE(plans.plan_b, nullptr);
+    fftconv::fftw_buffer<float> real(size);
+    fftconv::fftw_buffer<std::complex<float>> complex(size / 2 + 1);
+    fftconv::internal::Plans1d<float> plans(real, complex);
+    EXPECT_NE(plans.plan_forward.plan, nullptr);
+    EXPECT_NE(plans.plan_backward.plan, nullptr);
   }
   {
-    fftconv::internal::fftw_buffer<double> real(size);
-    fftconv::internal::fftw_buffer<fftw_complex> complex(size / 2 + 1);
-    fftconv::internal::fftw_plans_1d<double> plans(real, complex);
-    EXPECT_NE(plans.plan_f, nullptr);
-    EXPECT_NE(plans.plan_b, nullptr);
+    fftconv::fftw_buffer<double> real(size);
+    fftconv::fftw_buffer<std::complex<double>> complex(size / 2 + 1);
+    fftconv::internal::Plans1d<double> plans(real, complex);
+    EXPECT_NE(plans.plan_forward.plan, nullptr);
+    EXPECT_NE(plans.plan_backward.plan, nullptr);
   }
 }
 
 TEST(FFTWPlans1DFloatTest, ForwardTransform) {
-  using traits = fftconv::internal::fftw_plans_traits<float>;
+  using traits = fftw::Traits<float>;
   constexpr size_t size = 16; // Example size
   constexpr size_t size_cx = size / 2 + 1;
 
   // Initialize real_input
-  fftconv::internal::fftw_buffer<traits::Real> real_buffer{{
+  fftconv::fftw_buffer<traits::Real> real_buffer{{
       0.422464,
       0.32053405,
       0.3295821,
@@ -210,9 +200,8 @@ TEST(FFTWPlans1DFloatTest, ForwardTransform) {
       0.33394003,
       0.19078194,
   }};
-  fftconv::internal::fftw_buffer<traits::Complex> complex_buffer(size_cx);
-  fftconv::internal::fftw_plans_1d<float> fft_plans(real_buffer,
-                                                    complex_buffer);
+  fftconv::fftw_buffer<traits::Cx> complex_buffer(size_cx);
+  fftconv::internal::Plans1d<float> fft_plans(real_buffer, complex_buffer);
 
   // Expected fft
   using namespace std::complex_literals;
@@ -231,8 +220,8 @@ TEST(FFTWPlans1DFloatTest, ForwardTransform) {
   fft_plans.forward(real_buffer, complex_buffer);
 
   for (int i = 0; i < size_cx; i++) {
-    EXPECT_NEAR(complex_buffer[i][0], expected[i].real(), FloatTol);
-    EXPECT_NEAR(complex_buffer[i][1], expected[i].imag(), FloatTol);
+    EXPECT_NEAR(complex_buffer[i].real(), expected[i].real(), FloatTol);
+    EXPECT_NEAR(complex_buffer[i].imag(), expected[i].imag(), FloatTol);
   }
 }
 
@@ -295,14 +284,6 @@ TEST(Convolution, ExecuteOAConvCorrectlyDifferentSizes) {
   execute_conv_correctly_different_sizes<float>(
       fftconv::oaconvolve_fftw<float>);
 }
-
-// TEST(Convolution, ExecuteOAConvAdvancedCorrectlyDifferentSizes) {
-//   execute_conv_correctly_different_sizes<double>(
-//       fftconv::oaconvolve_fftw_advanced<double>);
-
-//   execute_conv_correctly_different_sizes<float>(
-//       fftconv::oaconvolve_fftw_advanced<float>);
-// }
 
 // Test convolution
 template <fftconv::FloatOrDouble Real, typename Func>

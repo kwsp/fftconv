@@ -5,33 +5,28 @@
 // Version 0.2.1
 #pragma once
 
+#include "fftw.hpp"
+
 #include <array>
 #include <cassert>
-#include <initializer_list>
+#include <complex>
 #include <memory>
-#include <mutex>
+// #include <mutex>
 #include <span>
 #include <type_traits>
 #include <unordered_map>
 
-#include <fftw3.h>
+// NOLINTBEGIN(*-reinterpret-cast, *-const-cast)
 
 namespace fftconv {
-
-template <typename T>
-concept FloatOrDouble = std::is_same_v<T, float> || std::is_same_v<T, double>;
-
-template <typename T>
-concept FFTWComplex =
-    std::is_same_v<T, fftw_complex> || std::is_same_v<T, fftwf_complex>;
-
-template <typename T>
-concept FFTWBufferSupported = FloatOrDouble<T> || FFTWComplex<T>;
+using fftw::fftw_buffer;
+using fftw::FloatOrDouble;
+using fftw::Plan;
 
 namespace internal {
 
 // NOLINTBEGIN(*-global-variables)
-static std::mutex *fftconv_fftw_mutex = nullptr;
+// static std::mutex *fftconv_fftw_mutex = nullptr;
 // NOLINTEND(*-global-variables)
 
 // static int nextpow2(int x) { return 1 << (int)(std::log2(x) + 1); }
@@ -72,24 +67,24 @@ template <class K, class V> auto get_cached(K key) {
   return val.get();
 }
 
-// In memory cache with key type K and value type V
-// additionally accepts a mutex to guard the V constructor
-template <class Key, class Val>
-auto get_cached_vlock(Key key, std::mutex *V_mutex) {
-  static thread_local std::unordered_map<Key, std::unique_ptr<Val>> _cache;
+// // In memory cache with key type K and value type V
+// // additionally accepts a mutex to guard the V constructor
+// template <class Key, class Val>
+// auto get_cached_vlock(Key key, std::mutex *V_mutex) {
+//   static thread_local std::unordered_map<Key, std::unique_ptr<Val>> _cache;
 
-  auto &val = _cache[key];
-  if (val == nullptr) {
-    // Using unique_lock here for RAII locking since the mutex is optional.
-    // If we have a non-optional mutex, prefer scoped_lock
-    const auto lock = V_mutex == nullptr ? std::unique_lock<std::mutex>{}
-                                         : std::unique_lock(*V_mutex);
+//   auto &val = _cache[key];
+//   if (val == nullptr) {
+//     // Using unique_lock here for RAII locking since the mutex is optional.
+//     // If we have a non-optional mutex, prefer scoped_lock
+//     const auto lock = V_mutex == nullptr ? std::unique_lock<std::mutex>{}
+//                                          : std::unique_lock(*V_mutex);
 
-    val = std::make_unique<Val>(key);
-  }
+//     val = std::make_unique<Val>(key);
+//   }
 
-  return val.get();
-}
+//   return val.get();
+// }
 
 // Copy data from src to dst and padded the extra with zero
 // dst_size must be greater than src_size
@@ -102,7 +97,7 @@ inline void copy_to_padded_buffer(const Real *src, const size_t src_size,
   std::fill(dst + src_size, dst + dst_size, 0);
 }
 
-template <typename Tin, typename Tout>
+template <typename Tin, typename Tout = Tin>
 inline void copy_to_padded_buffer(const std::span<const Tin> src,
                                   const std::span<Tout> dst) {
   // Assert that destination span is larger or equal to the source span
@@ -131,10 +126,10 @@ inline void copy_to_padded_buffer(const std::span<const Tin> src,
 //_res[i] = _a[i] * _b[i];
 //}
 
-template <FFTWComplex T>
-inline void elementwise_multiply(std::span<const T> complex1,
-                                 std::span<const T> complex2,
-                                 std::span<T> result) {
+template <fftw::FFTWComplex T>
+inline void elementwise_multiply_fftw_cx(std::span<const T> complex1,
+                                         std::span<const T> complex2,
+                                         std::span<T> result) {
   // implement naive complex multiply. This is much faster than the
   // std version, but doesn't handle infinities.
   // https://stackoverflow.com/questions/49438158/why-is-muldc3-called-when-two-stdcomplex-are-multiplied
@@ -150,293 +145,104 @@ inline void elementwise_multiply(std::span<const T> complex1,
   }
 }
 
-template <FFTWBufferSupported T> constexpr auto _fftw_alloc(const size_t size) {
-  if constexpr (std::is_same_v<T, double>) {
-    return static_cast<T *>(fftw_alloc_real(size));
-  } else if constexpr (std::is_same_v<T, fftw_complex>) {
-    return static_cast<T *>(fftw_alloc_complex(size));
-  } else if constexpr (std::is_same_v<T, float>) {
-    return static_cast<T *>(fftwf_alloc_real(size));
-  } else if constexpr (std::is_same_v<T, fftwf_complex>) {
-    return static_cast<T *>(fftwf_alloc_complex(size));
+template <typename T>
+inline void elementwise_multiply_cx(std::span<const std::complex<T>> complex1,
+                                    std::span<const std::complex<T>> complex2,
+                                    std::span<std::complex<T>> result) {
+  // implement naive complex multiply. This is much faster than the
+  // std version, but doesn't handle infinities.
+  // https://stackoverflow.com/questions/49438158/why-is-muldc3-called-when-two-stdcomplex-are-multiplied
+
+  const auto size = std::min(complex1.size(), complex2.size());
+  for (size_t i = 0; i < size; ++i) {
+    const auto a_1 = complex1[i].real();
+    const auto a_2 = complex1[i].imag();
+    const auto b_1 = complex2[i].real();
+    const auto b_2 = complex2[i].imag();
+    const auto real = a_1 * b_1 - a_2 * b_2;
+    const auto imag = a_2 * b_1 + a_1 * b_2;
+    result[i] = {real, imag};
   }
 }
 
-template <FFTWBufferSupported T> constexpr void _fftw_free(T *ptr) {
-  if (ptr != nullptr) {
-    if constexpr (std::is_same_v<T, double> ||
-                  std::is_same_v<T, fftw_complex>) {
-      fftw_free(ptr);
-    } else if constexpr (std::is_same_v<T, float> ||
-                         std::is_same_v<T, fftwf_complex>) {
-      fftwf_free(ptr);
-    }
-  }
-}
+template <FloatOrDouble Real> struct PlansBase {
+  using Cx = std::complex<Real>;
 
-/// @brief Encapsulate FFTW allocated buffer
-/// @tparam T
-template <FFTWBufferSupported T> class fftw_buffer {
-public:
-  fftw_buffer(const fftw_buffer &) = delete; // Copy constructor
-  fftw_buffer(fftw_buffer &&) = delete;      // Move constructor
-  auto operator=(const fftw_buffer &)
-      -> fftw_buffer & = delete;                            // Copy assignment
-  auto operator=(fftw_buffer &&) -> fftw_buffer & = delete; // Move assignment
+  Plan<Real> plan_forward;
+  Plan<Real> plan_backward;
 
-  explicit fftw_buffer(size_t size) : m_data(_fftw_alloc<T>(size), size) {
-    std::memset(m_data.data(), 0, sizeof(T) * m_data.size());
-  }
+  PlansBase(Plan<Real> &&forward, Plan<Real> &&backward)
+      : plan_forward(std::move(forward)), plan_backward(std::move(backward)) {}
 
-  fftw_buffer(std::initializer_list<T> list) : fftw_buffer(list.size()) {
-    std::copy(list.begin(), list.end(), this->begin());
-  }
-
-  // Destructor
-  ~fftw_buffer() { _fftw_free(m_data.data()); }
-
-  auto begin() noexcept { return m_data.begin(); }
-  auto end() noexcept { return m_data.end(); }
-  [[nodiscard]] auto begin() const noexcept { return m_data.begin(); }
-  [[nodiscard]] auto end() const noexcept { return m_data.end(); }
-
-  auto operator[](size_t idx) -> auto & { return m_data[idx]; }
-  auto operator[](size_t idx) const -> const auto & { return m_data[idx]; }
-
-  [[nodiscard]] auto size() const { return m_data.size(); }
-  [[nodiscard]] auto data() const { return m_data.data(); }
-
-  // return a span-like view of the data
-  [[nodiscard]] auto cspan() const -> std::span<const T> {
-    return m_data; // Create a span pointing to data with size
-  }
-  [[nodiscard]] auto span() -> std::span<T> {
-    return m_data; // Create a span pointing to data with size
-  }
-
-private:
-  std::span<T> m_data;
+  PlansBase() = default;
+  PlansBase(PlansBase &&other) = delete;
+  PlansBase(const PlansBase &other) = delete;
+  auto operator=(PlansBase &&other) -> PlansBase = delete;
+  auto operator=(const PlansBase &other) -> PlansBase = delete;
+  ~PlansBase() = default;
 };
 
-template <FloatOrDouble> struct fftw_plans_traits {};
+template <FloatOrDouble Real> struct Plans1d : public PlansBase<Real> {
+  using Cx = std::complex<Real>;
 
-template <> struct fftw_plans_traits<float> {
-  using Real = float;
-  using Complex = fftwf_complex;
+  explicit Plans1d(const fftw_buffer<Real> &real,
+                   const fftw_buffer<Cx> &complex)
+      : PlansBase<Real>(Plan<Real>::plan_dft_r2c_1d(real, complex),
+                        Plan<Real>::plan_dft_c2r_1d(complex, real)) {}
+
+  constexpr void forward(const fftw_buffer<Real> &real,
+                         fftw_buffer<Cx> &complex) const {
+    this->plan_forward.execute_dft_r2c(real, complex);
+  }
+
+  constexpr void backward(const fftw_buffer<Cx> &complex,
+                          fftw_buffer<Real> &real) const {
+    this->plan_backward.execute_dft_c2r(complex, real);
+  }
 };
 
-template <> struct fftw_plans_traits<double> {
-  using Real = double;
-  using Complex = fftw_complex;
+template <FloatOrDouble Real> struct Plans1dMany : public Plans1d<Real> {
+  using Cx = std::complex<Real>;
+
+  Plans1dMany(const fftw_buffer<Real> &real, const fftw_buffer<Cx> &complex,
+              int n_arrays) {
+    this->plan_forward = Plan<Real>::plan_many_dft_r2c(real, complex, n_arrays);
+    this->plan_backward =
+        Plan<Real>::plan_many_dft_c2r(complex, real, n_arrays);
+  }
 };
 
-template <FloatOrDouble> struct fftw_plans_1d {};
-
-template <> struct fftw_plans_1d<float> {
-  using real_t = typename fftw_plans_traits<float>::Real;
-  using complex_t = typename fftw_plans_traits<float>::Complex;
-
-  explicit fftw_plans_1d(const fftw_buffer<real_t> &real,
-                         const fftw_buffer<complex_t> &complex)
-      : plan_f(fftwf_plan_dft_r2c_1d(static_cast<int>(real.size()), real.data(),
-                                     complex.data(), FFTW_ESTIMATE)),
-        plan_b(fftwf_plan_dft_c2r_1d(static_cast<int>(real.size()),
-                                     complex.data(), real.data(),
-                                     FFTW_ESTIMATE)) {}
-  fftw_plans_1d(fftw_plans_1d &&other) = delete;
-  fftw_plans_1d(const fftw_plans_1d &other) = delete;
-  auto operator=(fftw_plans_1d &&other) -> fftw_plans_1d = delete;
-  auto operator=(const fftw_plans_1d &other) -> fftw_plans_1d = delete;
-
-  ~fftw_plans_1d() {
-    if (plan_f != nullptr) {
-      fftwf_destroy_plan(plan_f);
-    }
-    if (plan_b != nullptr) {
-      fftwf_destroy_plan(plan_b);
-    }
-  }
-
-  void forward(fftw_buffer<real_t> &real,
-               fftw_buffer<complex_t> &complex) const {
-    fftwf_execute_dft_r2c(plan_f, real.data(), complex.data());
-  }
-
-  void backward(fftw_buffer<complex_t> &complex,
-                fftw_buffer<real_t> &real) const {
-    fftwf_execute_dft_c2r(plan_b, complex.data(), real.data());
-  }
-
-  fftwf_plan plan_f;
-  fftwf_plan plan_b;
-};
-
-template <> struct fftw_plans_1d<double> {
-  using real_t = typename fftw_plans_traits<double>::Real;
-  using complex_t = typename fftw_plans_traits<double>::Complex;
-
-  explicit fftw_plans_1d(const fftw_buffer<real_t> &real,
-                         const fftw_buffer<complex_t> &complex)
-      : plan_f(fftw_plan_dft_r2c_1d(static_cast<int>(real.size()), real.data(),
-                                    complex.data(), FFTW_ESTIMATE)),
-        plan_b(fftw_plan_dft_c2r_1d(static_cast<int>(real.size()),
-                                    complex.data(), real.data(), FFTW_ESTIMATE))
-
-  {}
-  fftw_plans_1d(fftw_plans_1d &&other) = delete;
-  fftw_plans_1d(const fftw_plans_1d &other) = delete;
-  auto operator=(fftw_plans_1d &&other) -> fftw_plans_1d = delete;
-  auto operator=(const fftw_plans_1d &other) -> fftw_plans_1d = delete;
-
-  ~fftw_plans_1d() {
-    if (plan_f != nullptr) {
-      fftw_destroy_plan(plan_f);
-    }
-    if (plan_b != nullptr) {
-      fftw_destroy_plan(plan_b);
-    }
-  }
-
-  void forward(fftw_buffer<real_t> &real,
-               fftw_buffer<complex_t> &complex) const {
-    fftw_execute_dft_r2c(plan_f, real.data(), complex.data());
-  }
-  void backward(fftw_buffer<complex_t> &complex,
-                fftw_buffer<real_t> &real) const {
-    fftw_execute_dft_c2r(plan_b, complex.data(), real.data());
-  }
-
-  fftw_plan plan_f;
-  fftw_plan plan_b;
-};
-
-// template <FloatOrDouble> struct fftw_plans_many {};
-
-// template <> class fftw_plans_many<float> {
-// public:
-//   using real_t = typename fftw_plans_traits<float>::Real;
-//   using complex_t = typename fftw_plans_traits<float>::Complex;
-
-//   fftw_plans_many(const fftw_plans_many &) = delete;
-//   fftw_plans_many(fftw_plans_many &&) = delete;
-//   auto operator=(fftw_plans_many &&) -> fftw_plans_many & = delete;
-//   auto operator=(const fftw_plans_many &) -> fftw_plans_many & = delete;
-
-//   fftw_plans_many(const fftw_buffer<real_t> &real,
-//                   const fftw_buffer<complex_t> &complex, int n_arrays) {
-//     const int real_size = static_cast<int>(real.size());
-//     int rank = 1;
-//     int stride = 1;
-//     plan_f = fftwf_plan_many_dft_r2c(
-//         rank, &real_size, n_arrays, real.data(), nullptr, stride,
-//         static_cast<int>(real.size()), complex.data(), nullptr, stride,
-//         static_cast<int>(complex.size()), FFTW_ESTIMATE);
-
-//     plan_b = fftwf_plan_many_dft_c2r(
-//         rank, &real_size, n_arrays, complex.data(), nullptr, stride,
-//         static_cast<int>(complex.size()), real.data(), nullptr, stride,
-//         static_cast<int>(real.size()), FFTW_ESTIMATE);
-//   }
-
-//   ~fftw_plans_many() {
-//     if (plan_f != nullptr) {
-//       fftwf_free(plan_f);
-//     }
-//     if (plan_b != nullptr) {
-//       fftwf_free(plan_b);
-//     }
-//   }
-
-//   constexpr void forward(fftw_buffer<real_t> &real,
-//                          fftw_buffer<complex_t> &complex) const {
-//     fftwf_execute_dft_r2c(plan_f, real.data(), complex.data());
-//   }
-
-//   constexpr void backward(fftw_buffer<complex_t> &complex,
-//                           fftw_buffer<real_t> &real) const {
-//     fftwf_execute_dft_c2r(plan_b, complex.data(), real.data());
-//   }
-
-// private:
-//   fftwf_plan plan_f;
-//   fftwf_plan plan_b;
-// };
-
-// template <> class fftw_plans_many<double> {
-// public:
-//   using real_t = typename fftw_plans_traits<double>::Real;
-//   using complex_t = typename fftw_plans_traits<double>::Complex;
-
-//   fftw_plans_many(const fftw_plans_many &) = delete;
-//   fftw_plans_many(fftw_plans_many &&) = delete;
-//   auto operator=(fftw_plans_many &&) -> fftw_plans_many & = delete;
-//   auto operator=(const fftw_plans_many &) -> fftw_plans_many & = delete;
-
-//   fftw_plans_many(const fftw_buffer<real_t> &real,
-//                   const fftw_buffer<complex_t> &complex, int n_arrays) {
-//     const int real_size = static_cast<int>(real.size());
-//     int rank = 1;
-//     int stride = 1;
-//     plan_f = fftw_plan_many_dft_r2c(
-//         rank, &real_size, n_arrays, real.data(), nullptr, stride,
-//         static_cast<int>(real.size()), complex.data(), nullptr, stride,
-//         static_cast<int>(complex.size()), FFTW_ESTIMATE);
-
-//     plan_b = fftw_plan_many_dft_c2r(
-//         rank, &real_size, n_arrays, complex.data(), nullptr, stride,
-//         static_cast<int>(complex.size()), real.data(), nullptr, stride,
-//         static_cast<int>(real.size()), FFTW_ESTIMATE);
-//   }
-
-//   ~fftw_plans_many() {
-//     if (plan_f != nullptr) {
-//       fftw_free(plan_f);
-//     }
-//     if (plan_b != nullptr) {
-//       fftw_free(plan_b);
-//     }
-//   }
-
-//   constexpr void forward(fftw_buffer<real_t> &real,
-//                          fftw_buffer<complex_t> &complex) const {
-//     fftw_execute_dft_r2c(plan_f, real.data(), complex.data());
-//   }
-
-//   constexpr void backward(fftw_buffer<complex_t> &complex,
-//                           fftw_buffer<real_t> &real) const {
-//     fftw_execute_dft_c2r(plan_b, complex.data(), real.data());
-//   }
-
-// private:
-//   fftw_plan plan_f;
-//   fftw_plan plan_b;
-// };
 } // namespace internal
 
-// Since FFTW planners are not thread-safe, you can pass a pointer to a
-// std::mutex to fftconv and all calls to the planner with be guarded by the
-// mutex.
-inline void use_fftw_mutex(std::mutex *fftw_mutex) {
-  internal::fftconv_fftw_mutex = fftw_mutex;
-}
-inline auto get_fftw_mutex() -> std::mutex * {
-  return internal::fftconv_fftw_mutex;
-};
+// // Since FFTW planners are not thread-safe, you can pass a pointer to a
+// // std::mutex to fftconv and all calls to the planner with be guarded by the
+// // mutex.
+// inline void use_fftw_mutex(std::mutex *fftw_mutex) {
+//   internal::fftconv_fftw_mutex = fftw_mutex;
+// }
+// inline auto get_fftw_mutex() -> std::mutex * {
+//   return internal::fftconv_fftw_mutex;
+// };
 
 // fft_plans manages the memory of the forward and backward fft plans
 // and the fftw buffers
 //
 // Not using half complex transforms before it's non-trivial to do complex
 // multiplications with FFTW's half complex format
-template <FloatOrDouble Real> class fftconv_plans {
+template <fftw::FloatOrDouble Real> class fftconv_plans {
 public:
-  using Complex = typename internal::fftw_plans_traits<Real>::Complex;
+  using Cx = std::complex<Real>;
 
   // Get the fftconv_plans object for a specific kernel size
   static auto get(const size_t padded_length) -> auto & {
+    // thread_local static auto fftconv_plans_cache =
+    //     internal::get_cached_vlock<size_t, fftconv_plans<Real>>;
+    // return *fftconv_plans_cache(padded_length, get_fftw_mutex());
+
+    // Using thread_local storage for the cache
     thread_local static auto fftconv_plans_cache =
-        internal::get_cached_vlock<size_t, fftconv_plans<Real>>;
-    return *fftconv_plans_cache(padded_length, get_fftw_mutex());
+        internal::get_cached<size_t, fftconv_plans<Real>>;
+    return *fftconv_plans_cache(padded_length);
   }
 
   // Get the fftconv_plans object for a specific kernel size
@@ -457,23 +263,23 @@ public:
                 const std::span<const Real> kernel,
                 const std::span<Real> output) {
     std::fill(output.begin(), output.end(), static_cast<Real>(0));
-    const auto real_span = real.span();
+
+    std::span<Real> real_span(real);
 
     // Copy a to buffer
-    internal::copy_to_padded_buffer(input, real_span);
+    internal::copy_to_padded_buffer<Real>(input, real_span);
 
     // A = fft(a)
     plans.forward(real, complex1);
 
     // Copy b to buffer
-    internal::copy_to_padded_buffer(kernel, real_span);
+    internal::copy_to_padded_buffer<Real>(kernel, real_span);
 
     // B = fft(b)
     plans.forward(real, complex2);
 
     // Complex elementwise multiple, A = A * B
-    internal::elementwise_multiply(complex1.cspan(), complex2.cspan(),
-                                   complex1.span());
+    internal::elementwise_multiply_cx<Real>(complex1, complex2, complex1);
 
     // a = ifft(A)
     plans.backward(complex1, real);
@@ -483,7 +289,7 @@ public:
       real[i] /= real.size();
     }
 
-    std::copy(real_span.begin(), real_span.end(), output.begin());
+    std::copy(real.begin(), real.end(), output.begin());
   }
 
   void oaconvolve(const std::span<const Real> input,
@@ -494,9 +300,10 @@ public:
     const auto fft_size = real.size();
     const auto step_size = fft_size - (kernel.size() - 1);
 
+    std::span<Real> real_span(real);
+
     // forward fft of kernel and save to complex2
-    const auto real_span = real.span();
-    internal::copy_to_padded_buffer(kernel, real_span);
+    internal::copy_to_padded_buffer<Real>(kernel, real_span);
     plans.forward(real, complex2);
 
     // create forward/backward ffts for x
@@ -506,11 +313,10 @@ public:
       size_t len =
           std::min<size_t>(input.size() - pos, step_size); // bound check
 
-      internal::copy_to_padded_buffer(input.subspan(pos, len), real_span);
+      internal::copy_to_padded_buffer<Real>(input.subspan(pos, len), real_span);
       plans.forward(real, complex1);
 
-      internal::elementwise_multiply(complex1.cspan(), complex2.cspan(),
-                                     complex1.span());
+      internal::elementwise_multiply_cx<Real>(complex1, complex2, complex1);
 
       plans.backward(complex1, real);
 
@@ -532,9 +338,10 @@ public:
     const auto fft_size = real.size();
     const auto step_size = fft_size - (kernel.size() - 1);
 
+    std::span<Real> real_span(real);
+
     // forward fft of kernel and save to complex2
-    const auto real_span = real.span();
-    internal::copy_to_padded_buffer(kernel, real_span);
+    internal::copy_to_padded_buffer<Real>(kernel, real_span);
     plans.forward(real, complex2);
 
     const int64_t copy_start = kernel.size() / 2;
@@ -546,11 +353,10 @@ public:
     for (int64_t pos = 0; pos < input.size(); pos += step_size) {
       const int64_t len = std::min<size_t>(input.size() - pos, step_size);
 
-      internal::copy_to_padded_buffer(input.subspan(pos, len), real_span);
+      internal::copy_to_padded_buffer<Real>(input.subspan(pos, len), real_span);
       plans.forward(real, complex1);
 
-      internal::elementwise_multiply(complex1.cspan(), complex2.cspan(),
-                                     complex1.span());
+      internal::elementwise_multiply_cx<Real>(complex1, complex2, complex1);
 
       plans.backward(complex1, real);
 
@@ -567,116 +373,13 @@ public:
 
 private:
   // FFTW buffers
-  internal::fftw_buffer<Real> real;
-  internal::fftw_buffer<Complex> complex1;
-  internal::fftw_buffer<Complex> complex2;
+  fftw_buffer<Real> real;
+  fftw_buffer<Cx> complex1;
+  fftw_buffer<Cx> complex2;
 
   // FFTW plans
-  internal::fftw_plans_1d<Real> plans;
+  internal::Plans1d<Real> plans;
 };
-
-// struct fftconv_plans_advanced_cache_key {
-//   size_t padded_length;
-//   size_t n_arrays;
-//   auto operator==(const fftconv_plans_advanced_cache_key &other) const
-//       -> bool = default;
-// };
-
-// // fftconv_plans manages the memory of the forward and backward fft plans
-// // and the fftw buffers
-// // Plans are for the FFTW New-Array Execute Functions
-// // https://www.fftw.org/fftw3_doc/New_002darray-Execute-Functions.html
-// template <FloatOrDouble Real> class fftconv_plans_advanced {
-//   using Complex = internal::fftw_plans_traits<Real>::Complex;
-
-// public:
-//   static auto get(const fftconv_plans_advanced_cache_key &key) -> auto & {
-//     thread_local static auto cache =
-//         internal::get_cached_vlock<fftconv_plans_advanced_cache_key,
-//                                    fftconv_plans_advanced<Real>>;
-//     return *cache(key, get_fftw_mutex());
-//   }
-
-//   fftconv_plans_advanced(const fftconv_plans_advanced_cache_key &key)
-//       : fftconv_plans_advanced(key.padded_length, key.n_arrays) {}
-
-//   // Use advanced interface
-//   explicit fftconv_plans_advanced(const size_t padded_length,
-//                                   const size_t n_arrays = 1)
-//       : n_arrays(n_arrays), kernel_real(padded_length),
-//         kernel_cx(padded_length / 2 + 1), signal_real(padded_length *
-//         n_arrays), signal_cx(padded_length * n_arrays),
-//         plan_kernel(kernel_real, kernel_cx),
-//         plan_signal(signal_real, signal_cx, n_arrays) {
-//     // `howmany` is the (nonnegative) number of transforms to compute.
-//     // - The resulting plan computs `howmany` transforms, where the input of
-//     //   the k-th transform is at location `in+k*idist`
-//     // - Each of `howmany` has rank `rank` and size `n`
-//   }
-
-//   void oaconvolve(const std::span<const Real> arr,
-//                   const std::span<const Real> kernel, std::span<Real> res) {
-
-//     auto kernel_real_span = kernel_real.span();
-//     auto signal_real_span = signal_real.span();
-
-//     // Forward kernel
-//     internal::copy_to_padded_buffer(kernel, kernel_real_span);
-//     plan_kernel.forward(kernel_real, kernel_cx);
-
-//     // Forward signal
-//     const auto fft_size = kernel_real.size();
-//     const auto step_size = fft_size - (kernel.size() - 1);
-//     for (size_t pos = 0, idx = 0; pos < arr.size(); pos += step_size, idx++)
-//     {
-//       size_t len = std::min<size_t>(arr.size() - pos, step_size); // bound
-//       check internal::copy_to_padded_buffer(arr.subspan(pos, len),
-//       signal_real_span);
-//     }
-//     plan_signal.forward(signal_real, signal_cx);
-
-//     // Complex multiply
-//     auto signal_cx_span = signal_cx.span();
-//     auto kernel_cx_span = kernel_cx.cspan();
-//     for (int i = 0; i < n_arrays; ++i) {
-//       auto signal_cx_subspan = signal_cx_span.subspan(i * kernel_cx.size());
-//       internal::elementwise_multiply(
-//           std::span<const Complex>(signal_cx_subspan), kernel_cx_span,
-//           signal_cx_subspan);
-//     }
-
-//     // Backward
-//     plan_signal.backward(signal_cx, signal_real);
-
-//     // Copy results
-//     const double fct = 1. / kernel_real.size();
-//     for (size_t pos = 0, idx = 0; pos < res.size(); pos += step_size, idx++)
-//     {
-//       size_t len = std::min<size_t>(res.size() - pos, fft_size); // bound
-//       check auto res_subspan = res.subspan(pos, len);
-
-//       const auto size2 = std::min<size_t>(kernel_real.size(), len);
-//       const size_t pos2 = idx * kernel_real.size();
-//       for (int i = 0; i < size2; ++i) {
-//         res_subspan[i] += signal_real[pos + i] * fct;
-//       }
-//     }
-//   }
-
-// private:
-//   // FFTW buffer sizes
-//   size_t n_arrays;
-
-//   // FFTW padded buffers
-//   internal::fftw_buffer<Real> signal_real;
-//   internal::fftw_buffer<Complex> signal_cx;
-//   internal::fftw_buffer<Real> kernel_real;
-//   internal::fftw_buffer<Complex> kernel_cx;
-
-//   // FFTW plans
-//   internal::fftw_plans_1d<Real> plan_kernel;
-//   internal::fftw_plans_many<Real> plan_signal;
-// };
 
 // 1D convolution using the FFT
 //
@@ -791,7 +494,7 @@ void convolve_fftw_ref(const std::span<const double> input,
 
   // Perform element-wise product of FFT(a) and FFT(b)
   // then compute inverse fourier transform.
-  internal::elementwise_multiply(
+  internal::elementwise_multiply_fftw_cx(
       std::span<fftw_complex const>(A_buf, complex_length),
       std::span<fftw_complex const>(B_buf, complex_length),
       std::span(input_buffer, complex_length));
@@ -816,33 +519,6 @@ void convolve_fftw_ref(const std::span<const double> input,
   fftw_destroy_plan(plan_backward);
 }
 
-// template <FloatOrDouble Real>
-// void oaconvolve_fftw_advanced(const std::span<const Real> arr,
-//                               const std::span<const Real> kernel,
-//                               std::span<Real> res) {
-//   // more optimal size for each fft
-//   const auto fft_size = internal::get_optimal_fft_size(kernel.size());
-//   const auto step_size = fft_size - (kernel.size() - 1);
-//   const auto n_arrays = arr.size() / step_size + 1; // last batch zero pad
-
-//   auto &plans = fftconv_plans_advanced<Real>::get({fft_size, n_arrays});
-//   plans.oaconvolve(arr, kernel, res);
-// }
-
 } // namespace fftconv
 
-// template <> struct std::hash<fftconv::fftconv_plans_advanced_cache_key> {
-//   auto operator()(const fftconv::fftconv_plans_advanced_cache_key &key)
-//       const noexcept -> size_t {
-//     size_t seed = 0;
-//     std::hash<size_t> hasher;
-//     // Combine hashes like boost::has_combine
-//     // May not be great and needs more testing
-//     // NOLINTBEGIN(*-magic-numbers)
-//     seed ^= hasher(key.padded_length) + 0x9e3779b9 + (seed << 6) + (seed >>
-//     2); seed ^= hasher(key.n_arrays) + 0x9e3779b9 + (seed << 6) + (seed >>
-//     2);
-//     // NOLINTEND(*-magic-numbers)
-//     return seed;
-//   }
-// };
+// NOLINTEND(*-reinterpret-cast, *-const-cast)
