@@ -30,16 +30,12 @@ void arma_conv_full(const std::span<const Real> span1,
 
 template <fftconv::FloatOrDouble Real, typename Func>
 void conv_bench_full(benchmark::State &state, Func conv_func) {
-  arma::Col<Real> vec1(state.range(0), arma::fill::randn);
-  arma::Col<Real> vec2(state.range(1), arma::fill::randn);
-  arma::Col<Real> res(vec1.size() + vec2.size() - 1);
-
-  const std::span<const Real> span1(vec1);
-  const std::span<const Real> span2(vec2);
-  std::span<Real> span_res(res);
+  arma::Col<Real> input(state.range(0), arma::fill::randn);
+  arma::Col<Real> kernel(state.range(1), arma::fill::randn);
+  arma::Col<Real> output(input.size() + kernel.size() - 1);
 
   for (auto _ : state) {
-    conv_func(vec1, vec2, res);
+    conv_func(input, kernel, output);
   }
 }
 
