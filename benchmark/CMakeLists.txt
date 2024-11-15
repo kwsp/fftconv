@@ -16,7 +16,6 @@ target_link_libraries(bench_fftconv PRIVATE fftconv fftconv_pocket)
 
 target_link_libraries(bench_fftconv
     PRIVATE
-    benchmark::benchmark
     benchmark::benchmark_main
     armadillo
     kfr
