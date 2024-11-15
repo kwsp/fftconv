@@ -154,6 +154,7 @@ inline void elementwise_multiply_cx(std::span<const std::complex<T>> complex1,
   // https://stackoverflow.com/questions/49438158/why-is-muldc3-called-when-two-stdcomplex-are-multiplied
 
   const auto size = std::min(complex1.size(), complex2.size());
+#pragma clang loop vectorize(enable)
   for (size_t i = 0; i < size; ++i) {
     const auto a_1 = complex1[i].real();
     const auto a_2 = complex1[i].imag();
@@ -235,14 +236,7 @@ public:
 
   // Get the fftconv_plans object for a specific kernel size
   static auto get(const size_t padded_length) -> auto & {
-    // thread_local static auto fftconv_plans_cache =
-    //     internal::get_cached_vlock<size_t, fftconv_plans<Real>>;
-    // return *fftconv_plans_cache(padded_length, get_fftw_mutex());
-
-    // Using thread_local storage for the cache
-    thread_local static auto fftconv_plans_cache =
-        internal::get_cached<size_t, fftconv_plans<Real>>;
-    return *fftconv_plans_cache(padded_length);
+    return *internal::get_cached<size_t, fftconv_plans<Real>>(padded_length);
   }
 
   // Get the fftconv_plans object for a specific kernel size

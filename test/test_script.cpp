@@ -8,6 +8,7 @@
 #include <span>
 
 #include "fftconv.hpp" // fftw impl
+#include "fftw.hpp"
 // #include "fftconv_pocket.hpp" // pocketfft impl
 #include "test_helpers.hpp"
 
@@ -93,11 +94,14 @@ template <typename T> void run_bench() {
 
 auto main() -> int {
 
+  fftw::import_wisdom();
+
   std::cout << "Testing double ...\n";
   run_bench<double>();
 
   std::cout << "\nTesting float ...\n";
   run_bench<float>();
 
+  fftw::export_wisdom();
   return 0;
 }

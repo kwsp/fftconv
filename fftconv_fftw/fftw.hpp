@@ -15,6 +15,11 @@ Author: Taylor Nie
 
 namespace fftw {
 
+void export_wisdom() { fftw_export_wisdom_to_filename(".fftw_wisdom"); }
+void import_wisdom() { fftw_import_wisdom_from_filename(".fftw_wisdom"); }
+
+constexpr int DEFAULT_PLANNER_FLAG = FFTW_EXHAUSTIVE;
+
 template <typename T>
 concept FloatOrDouble = std::is_same_v<T, float> || std::is_same_v<T, double>;
 
@@ -105,7 +110,7 @@ template <> struct Plan<double> : Traits<double> {
 
   static Plan<Real> plan_dft_r2c_1d(std::span<const Real> real,
                                     std::span<const Cx> complex,
-                                    unsigned int flags = FFTW_ESTIMATE) {
+                                    unsigned int flags = DEFAULT_PLANNER_FLAG) {
     const int n = static_cast<int>(real.size());
     auto *real_p = const_cast<Real *>(real.data());
     auto *cx_p = reinterpret_cast<FFTW_Cx *>(const_cast<Cx *>(complex.data()));
@@ -115,7 +120,7 @@ template <> struct Plan<double> : Traits<double> {
 
   static Plan<Real> plan_dft_c2r_1d(std::span<const Cx> complex,
                                     std::span<const Real> real,
-                                    unsigned int flags = FFTW_ESTIMATE) {
+                                    unsigned int flags = DEFAULT_PLANNER_FLAG) {
     const int n = static_cast<int>(real.size());
     auto *real_p = const_cast<Real *>(real.data());
     auto *cx_p = reinterpret_cast<FFTW_Cx *>(const_cast<Cx *>(complex.data()));
@@ -125,7 +130,8 @@ template <> struct Plan<double> : Traits<double> {
 
   static Plan<Real> plan_many_dft_r2c(const fftw_buffer<Real> &real,
                                       const fftw_buffer<Cx> &complex,
-                                      int n_arrays, int flags = FFTW_ESTIMATE) {
+                                      int n_arrays,
+                                      int flags = DEFAULT_PLANNER_FLAG) {
     auto *real_p = const_cast<Real *>(real.data());
     auto *cx_p = reinterpret_cast<FFTW_Cx *>(const_cast<Cx *>(complex.data()));
 
@@ -142,7 +148,8 @@ template <> struct Plan<double> : Traits<double> {
 
   static Plan<Real> plan_many_dft_c2r(const fftw_buffer<Cx> &complex,
                                       const fftw_buffer<Real> &real,
-                                      int n_arrays, int flags = FFTW_ESTIMATE) {
+                                      int n_arrays,
+                                      int flags = DEFAULT_PLANNER_FLAG) {
     auto *real_p = const_cast<Real *>(real.data());
     auto *cx_p = reinterpret_cast<FFTW_Cx *>(const_cast<Cx *>(complex.data()));
 
@@ -190,7 +197,7 @@ template <> struct Plan<float> : Traits<float> {
 
   static Plan<Real> plan_dft_r2c_1d(std::span<const Real> real,
                                     std::span<const Cx> complex,
-                                    unsigned int flags = FFTW_ESTIMATE) {
+                                    unsigned int flags = DEFAULT_PLANNER_FLAG) {
     const int n = static_cast<int>(real.size());
     auto *real_p = const_cast<Real *>(real.data());
     auto *cx_p = reinterpret_cast<FFTW_Cx *>(const_cast<Cx *>(complex.data()));
@@ -200,7 +207,7 @@ template <> struct Plan<float> : Traits<float> {
 
   static Plan<Real> plan_dft_c2r_1d(std::span<const Cx> complex,
                                     std::span<const Real> real,
-                                    unsigned int flags = FFTW_ESTIMATE) {
+                                    unsigned int flags = DEFAULT_PLANNER_FLAG) {
     const int n = static_cast<int>(real.size());
     auto *real_p = const_cast<Real *>(real.data());
     auto *cx_p = reinterpret_cast<FFTW_Cx *>(const_cast<Cx *>(complex.data()));
@@ -210,7 +217,8 @@ template <> struct Plan<float> : Traits<float> {
 
   static Plan<Real> plan_many_dft_r2c(const fftw_buffer<Real> &real,
                                       const fftw_buffer<Cx> &complex,
-                                      int n_arrays, int flags = FFTW_ESTIMATE) {
+                                      int n_arrays,
+                                      int flags = DEFAULT_PLANNER_FLAG) {
     auto *real_p = const_cast<Real *>(real.data());
     auto *cx_p = reinterpret_cast<FFTW_Cx *>(const_cast<Cx *>(complex.data()));
 
@@ -227,7 +235,8 @@ template <> struct Plan<float> : Traits<float> {
 
   static Plan<Real> plan_many_dft_c2r(const fftw_buffer<Cx> &complex,
                                       const fftw_buffer<Real> &real,
-                                      int n_arrays, int flags = FFTW_ESTIMATE) {
+                                      int n_arrays,
+                                      int flags = DEFAULT_PLANNER_FLAG) {
     auto *real_p = const_cast<Real *>(real.data());
     auto *cx_p = reinterpret_cast<FFTW_Cx *>(const_cast<Cx *>(complex.data()));
 
