@@ -15,8 +15,28 @@ Author: Taylor Nie
 
 namespace fftw {
 
-void export_wisdom() { fftw_export_wisdom_to_filename(".fftw_wisdom"); }
-void import_wisdom() { fftw_import_wisdom_from_filename(".fftw_wisdom"); }
+// Place this at the beginning of main() and RAII will take care of setting up
+// and tearing down FFTW3 (threads and wisdom)
+struct FFTWGlobalSetup {
+  FFTWGlobalSetup() {
+    static bool callSetup = true;
+    if (callSetup) {
+      fftw_init_threads();
+      fftwf_init_threads();
+      callSetup = false;
+    }
+    fftw_import_wisdom_from_filename(".fftw_wisdom");
+    fftwf_import_wisdom_from_filename(".fftwf_wisdom");
+  }
+  FFTWGlobalSetup(const FFTWGlobalSetup &) = delete;
+  FFTWGlobalSetup(FFTWGlobalSetup &&) = delete;
+  FFTWGlobalSetup &operator=(const FFTWGlobalSetup &) = delete;
+  FFTWGlobalSetup &operator=(FFTWGlobalSetup &&) = delete;
+  ~FFTWGlobalSetup() {
+    fftw_export_wisdom_to_filename(".fftw_wisdom");
+    fftwf_export_wisdom_to_filename(".fftwf_wisdom");
+  }
+};
 
 constexpr int DEFAULT_PLANNER_FLAG = FFTW_EXHAUSTIVE;
 

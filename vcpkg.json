@@ -10,11 +10,12 @@
     {
       "name": "fftw3",
       "platform": "x64",
-      "features": ["avx2"]
+      "features": ["avx2", "threads"]
     },
     {
       "name": "fftw3",
-      "platform": "!x64"
+      "platform": "!x64",
+      "features": ["threads"]
     },
     "kfr"
   ],

@@ -8,14 +8,9 @@
 #include "fftw.hpp"
 // #include "fftconv_pocket.hpp"
 
-using std::vector;
-
 // NOLINTBEGIN(*-identifier-length)
 
 //------------------ Helper functions
-
-static void DoSetup(const benchmark::State &state) { fftw::import_wisdom(); }
-static void DoTeardown(const benchmark::State &state) { fftw::export_wisdom(); }
 
 // Wrapper to prevent arma::conv from being optimized away
 // Not storing results back in res.
@@ -95,27 +90,16 @@ template <fftconv::FloatOrDouble Real>
 void BM_oaconvolve(benchmark::State &state) {
   conv_bench_full<Real>(state, fftconv::oaconvolve_fftw<Real>);
 }
-BENCHMARK(BM_oaconvolve<double>)
-    ->ArgsProduct(args)
-    ->Setup(DoSetup)
-    ->Teardown(DoTeardown);
-BENCHMARK(BM_oaconvolve<float>)
-    ->ArgsProduct(args)
-    ->Setup(DoSetup)
-    ->Teardown(DoTeardown);
+
+BENCHMARK(BM_oaconvolve<double>)->ArgsProduct(args);
+BENCHMARK(BM_oaconvolve<float>)->ArgsProduct(args);
 
 template <fftconv::FloatOrDouble Real>
 void BM_oaconvolve_same(benchmark::State &state) {
   conv_bench_same<Real>(state, fftconv::oaconvolve_fftw_same<Real>);
 }
-BENCHMARK(BM_oaconvolve_same<double>)
-    ->ArgsProduct(args)
-    ->Setup(DoSetup)
-    ->Teardown(DoTeardown);
-BENCHMARK(BM_oaconvolve_same<float>)
-    ->ArgsProduct(args)
-    ->Setup(DoSetup)
-    ->Teardown(DoTeardown);
+BENCHMARK(BM_oaconvolve_same<double>)->ArgsProduct(args);
+BENCHMARK(BM_oaconvolve_same<float>)->ArgsProduct(args);
 
 // template <fftconv::FloatOrDouble Real>
 // void BM_convolve(benchmark::State &state) {
@@ -147,4 +131,11 @@ BENCHMARK(BM_oaconvolve_same<float>)
 
 // NOLINTEND(*-identifier-length)
 
-BENCHMARK_MAIN();
+// BENCHMARK_MAIN();
+
+int main(int argc, char **argv) {
+  fftw::FFTWGlobalSetup fftwSetup;
+
+  benchmark::Initialize(&argc, argv);
+  benchmark::RunSpecifiedBenchmarks();
+}

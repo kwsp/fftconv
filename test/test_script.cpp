@@ -93,8 +93,7 @@ template <typename T> void run_bench() {
 };
 
 auto main() -> int {
-
-  fftw::import_wisdom();
+  fftw::FFTWGlobalSetup _fftwSetup;
 
   std::cout << "Testing double ...\n";
   run_bench<double>();
@@ -102,6 +101,5 @@ auto main() -> int {
   std::cout << "\nTesting float ...\n";
   run_bench<float>();
 
-  fftw::export_wisdom();
   return 0;
 }
