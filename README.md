@@ -1,8 +1,24 @@
 # fftconv
 
-Extremely fast 1D discrete convolutions of real vectors.
+Extremely fast CPU 1D discrete convolutions. [Faster than Intel IPP and Apple Accelerate on their respective platforms](https://github.com/kwsp/microbenchmarks/tree/main/src/conv1d)
+
+*Kernel size = 245*
+
+<p align="center">
+  <img src="https://github.com/kwsp/microbenchmarks/blob/main/src/conv1d/plots/Conv1d%20Throughput%20Bar%20(k%3D245)%2013th%20Gen%20Intel(R)%20Core(TM)%20i9-13900K.svg" width="45%">
+  <img src="https://github.com/kwsp/microbenchmarks/blob/main/src/conv1d/plots/Conv1d%20Throughput%20Line%20(k%3D245)%2013th%20Gen%20Intel(R)%20Core(TM)%20i9-13900K.svg" width="45%">
+</p>
+
+<p align="center">
+  <img src="https://github.com/kwsp/microbenchmarks/blob/main/src/conv1d/plots/Conv1d%20Throughput%20Bar%20(k%3D245)%20Apple%20M1.svg" width="45%">
+  <img src="https://github.com/kwsp/microbenchmarks/blob/main/src/conv1d/plots/Conv1d%20Throughput%20Line%20(k%3D245)%20Apple%20M1.svg" width="45%">
+</p>
 
 It's well know that convolution in the time domain is equivalent to multiplication in the frequency domain (circular convolution). With the Fast Fourier Transform, we can reduce the time complexity of a discrete convolution from `O(n^2)` to `O(n log(n))`, where `n` is the larger of the two array sizes. The **[overlap-add method](https://en.wikipedia.org/wiki/Overlap%E2%80%93add_method)** is a fast convolution method commonly use in FIR filtering, where the discrete signal is often much longer than the FIR filter kernel.
+
+## Usage
+
+Check [this repo](https://github.com/kwsp/microbenchmarks) to see how to use fftconv as a custom port through VCPKG.
 
 - `fftconv::convolve_fftw` implements FFT convolution.
 - `fftconv::oaconvolve_fftw` implements FFT convolution using the overlap-add method, much faster when one sequence is much longer than the other (e.g. in FIR filtering).
@@ -10,7 +26,7 @@ It's well know that convolution in the time domain is equivalent to multiplicati
 All convolution functions support `float` and `double` and use a C++20 `std::span` interface.
 
 ```C++
-template <internal::FloatOrDouble Real>
+template <FloatOrDouble Real>
 void oaconvolve_fftw(const std::span<const Real> arr,
                      const std::span<const Real> kernel, std::span<Real> res);
 ```
@@ -19,9 +35,9 @@ Python bindings are provided through Cython.
 
 ## Build the test and benchmark
 
-Use VCPKG to manage the dependencies and CMake to build the project.
+**This benchmark is out of date**. Check [this repo](https://github.com/kwsp/microbenchmarks) for the up-to-date benchmarks.
 
-The only dependency of `fftconv` is [fftw3](http://fftw.org/). Since the float and double interface of `fftw3` are used, you would need to link with `-lfftw -lfftwf`.
+The only dependency of `fftconv` is [fftw3](http://fftw.org/). Since the float and double interface of `fftw3` are used, link with `-lfftw -lfftwf`.
 
 Benchmark and test dependencies:
 
