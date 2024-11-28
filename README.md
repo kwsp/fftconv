@@ -1,6 +1,6 @@
 # fftconv
 
-Extremely fast CPU 1D discrete convolutions. [Faster than Intel IPP and Apple Accelerate on their respective platforms](https://github.com/kwsp/microbenchmarks/tree/main/src/conv1d)
+Extremely fast CPU 1D convolutions. [Faster than Intel IPP and Apple Accelerate on their respective platforms](https://github.com/kwsp/microbenchmarks/tree/main/src/conv1d)
 
 *Kernel size = 245*
 
