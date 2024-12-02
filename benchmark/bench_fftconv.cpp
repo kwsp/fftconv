@@ -1,7 +1,5 @@
 #include <armadillo>
 #include <benchmark/benchmark.h>
-#include <kfr/all.hpp>
-#include <kfr/base/univector.hpp>
 #include <span>
 
 #include "fftconv.hpp"
@@ -36,19 +34,6 @@ void conv_bench_full(benchmark::State &state, Func conv_func) {
   for (auto _ : state) {
     conv_func(input, kernel, output);
   }
-}
-
-template <fftconv::FloatOrDouble Real>
-void kfr_conv(const std::span<const Real> span1,
-              const std::span<const Real> span2, std::span<Real> span_res) {
-
-  auto inData = kfr::make_univector(span1.data(), span1.size());
-  auto taps = kfr::make_univector(span2.data(), span2.size());
-  auto res = kfr::make_univector(span_res.data(), span_res.size());
-
-  kfr::filter_fir<Real> filter(taps);
-  // kfr::convolve_filter<T> filter(taps);
-  filter.apply(res, inData);
 }
 
 // Wrapper to prevent arma::conv from being optimized away
@@ -121,13 +106,6 @@ BENCHMARK(BM_oaconvolve_same<float>)->ArgsProduct(args);
 // }
 // BENCHMARK(BM_arma_conv_same<double>)->ArgsProduct(args);
 // BENCHMARK(BM_arma_conv_same<float>)->ArgsProduct(args);
-
-// template <fftconv::FloatOrDouble Real>
-// void BM_kfr_conv_same(benchmark::State &state) {
-//   conv_bench_same<Real>(state, kfr_conv<Real>);
-// }
-// BENCHMARK(BM_kfr_conv_same<double>)->ArgsProduct(args);
-// BENCHMARK(BM_kfr_conv_same<float>)->ArgsProduct(args);
 
 // NOLINTEND(*-identifier-length)
 

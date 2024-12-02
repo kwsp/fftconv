@@ -5,7 +5,6 @@ enable_testing()
 
 find_package(Armadillo CONFIG)
 find_package(GTest CONFIG REQUIRED)
-find_package(KFR CONFIG REQUIRED)
 find_package(fmt CONFIG REQUIRED)
 
 
@@ -24,10 +23,6 @@ target_link_libraries(test_script_fftconv
     armadillo
     fftconv
     fftconv_pocket
-    kfr
-    kfr_io
-    kfr_dsp
-    kfr_dsp_neon64
 )
 
 

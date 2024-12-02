@@ -4,7 +4,6 @@
 #include <cstring>
 #include <fmt/format.h>
 #include <iostream>
-#include <kfr/all.hpp>
 #include <span>
 
 #include "fftconv.hpp" // fftw impl
@@ -32,22 +31,6 @@ void bench(const arma::Col<T> &input, const arma::Col<T> &kernel) {
   timeit(
       "oaconvolve_fftw",
       [&]() { fftconv::oaconvolve_fftw<T>(input, kernel, output); }, N_RUNS);
-
-  {
-    // kfr::univector<T> expected(input.size());
-    // timeit(
-    //     "kfr_fir",
-    //     [&]() {
-    //       // Test fftconv against KFR
-    //       auto inData = kfr::make_univector(input.memptr(), input.size());
-    //       auto taps = kfr::make_univector(kernel.memptr(), kernel.size());
-
-    //       kfr::filter_fir<T> filter(taps);
-    //       // kfr::convolve_filter<T> filter(taps);
-    //       filter.apply(expected, inData);
-    //     },
-    //     N_RUNS);
-  }
 }
 
 template <typename T> void run_bench() {

@@ -10,14 +10,13 @@
     {
       "name": "fftw3",
       "platform": "x64",
-      "features": ["avx2", "threads"]
+      "features": ["threads", "avx2"]
     },
     {
       "name": "fftw3",
       "platform": "!x64",
       "features": ["threads"]
-    },
-    "kfr"
+    }
   ],
   "builtin-baseline": "43d81795a513e2ca6648354786178714f33c8b6f"
 }
