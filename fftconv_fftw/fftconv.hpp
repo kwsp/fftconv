@@ -220,7 +220,7 @@ inline void multiply_cx(std::span<const std::complex<T>> cx1,
     multiply_cx_serial(cx1, cx2, out);
   }
 #else
-  elementwise_multiply_cx_serial(cx1, cx2, out);
+  multiply_cx_serial(cx1, cx2, out);
 #endif
 }
 
