@@ -220,11 +220,11 @@ inline __m256 mult_c64_avx2(__m256 vec1, __m256 vec2) {
   const __m256 neg =
       _mm256_setr_ps(1.0f, -1.0f, 1.0f, -1.0f, 1.0f, -1.0f, 1.0f, -1.0f);
 
-  __m256 v3 = _mm256_mul_ps(vec1, vec2);
+  __m256 vec3 = _mm256_mul_ps(vec1, vec2);
   vec2 = _mm256_permute_ps(vec2, 0b10110001);
   vec2 = _mm256_mul_ps(vec2, neg);
-  __m256 v4 = _mm256_mul_ps(vec1, vec2);
-  vec1 = _mm256_hsub_ps(v3, v4);
+  __m256 vec4 = _mm256_mul_ps(vec1, vec2);
+  vec1 = _mm256_hsub_ps(vec3, vec4);
   vec1 = _mm256_permute_ps(vec1, 0b11011000);
   return vec1;
 }
@@ -280,7 +280,6 @@ inline void multiply_cx_haswell(std::span<const std::complex<T>> cx1,
     }
   }
 
-  // Remainder loop for scalar processing
   for (size_t i = vec_end; i < vec_size; ++i) {
     const auto a_1 = cx1[i].real();
     const auto a_2 = cx1[i].imag();
