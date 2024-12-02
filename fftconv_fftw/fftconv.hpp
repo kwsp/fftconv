@@ -189,6 +189,111 @@ inline void multiply_cx_neon_f32(std::span<const std::complex<float>> cx1,
 }
 #endif
 
+#if defined(__AVX2__)
+
+#include <immintrin.h>
+
+__m256d mult_c128_avx2(__m256d vec1, __m256d vec2) {
+  // vec1 and vec2 each have 2 128bit complex
+  const __m256d neg = _mm256_setr_pd(1.0, -1.0, 1.0, -1.0);
+
+  // 1. Multiply
+  auto vec3 = _mm256_mul_pd(vec1, vec2);
+
+  // 2. switch the real and imag parts of vec2
+  vec2 = _mm256_permute_pd(vec2, 0x5);
+
+  // 3. negate the imag parts of vec2
+  vec2 = _mm256_mul_pd(vec2, neg);
+
+  // 4. multiply vec1 and the modified vec2
+  auto vec4 = _mm256_mul_pd(vec1, vec2);
+
+  // horizontally subtract the elements in vec3 and vec4
+  vec1 = _mm256_hsub_pd(vec3, vec4);
+
+  return vec1;
+}
+
+inline __m256 mult_c64_avx2(__m256 vec1, __m256 vec2) {
+  // vec1 and vec2 each have 4 64bit complex
+  const __m256 neg =
+      _mm256_setr_ps(1.0f, -1.0f, 1.0f, -1.0f, 1.0f, -1.0f, 1.0f, -1.0f);
+
+  __m256 v3 = _mm256_mul_ps(vec1, vec2);
+  vec2 = _mm256_permute_ps(vec2, 0b10110001);
+  vec2 = _mm256_mul_ps(vec2, neg);
+  __m256 v4 = _mm256_mul_ps(vec1, vec2);
+  vec1 = _mm256_hsub_ps(v3, v4);
+  vec1 = _mm256_permute_ps(vec1, 0b11011000);
+  return vec1;
+}
+
+template <typename T>
+inline void multiply_cx_haswell(std::span<const std::complex<T>> cx1,
+                                std::span<const std::complex<T>> cx2,
+                                std::span<std::complex<T>> out) {
+  constexpr size_t simd_width = 256 / (8 * sizeof(T));
+  const size_t vec_size = std::min({cx1.size(), cx2.size(), out.size()});
+  const size_t vec_end = vec_size / (simd_width / 2) * (simd_width / 2);
+  // Process pairs of complex numbers
+
+  if constexpr (std::is_same_v<T, float>) {
+
+    const __m256 neg =
+        _mm256_setr_ps(1.0f, -1.0f, 1.0f, -1.0f, 1.0f, -1.0f, 1.0f, -1.0f);
+
+    for (size_t i = 0; i < vec_end; i += simd_width / 2) {
+      // Load interleaved real and imaginary parts
+      __m256 vec1 = _mm256_load_ps(reinterpret_cast<const float *>(&cx1[i]));
+      __m256 vec2 = _mm256_load_ps(reinterpret_cast<const float *>(&cx2[i]));
+
+      // auto res = mult_c64_avx2(vec1, vec2);
+      // _mm256_storeu_ps(reinterpret_cast<float *>(&out[i]), res);
+
+      __m256 vec3 = _mm256_mul_ps(vec1, vec2);
+      vec2 = _mm256_permute_ps(vec2, 0b10110001);
+      vec2 = _mm256_mul_ps(vec2, neg);
+      __m256 vec4 = _mm256_mul_ps(vec1, vec2);
+      vec1 = _mm256_hsub_ps(vec3, vec4);
+      vec1 = _mm256_permute_ps(vec1, 0b11011000);
+      _mm256_store_ps(reinterpret_cast<float *>(&out[i]), vec1);
+    }
+  } else if constexpr (std::is_same_v<T, double>) {
+
+    const __m256d neg = _mm256_setr_pd(1.0, -1.0, 1.0, -1.0);
+    for (size_t i = 0; i < vec_end; i += simd_width / 2) {
+      // Load interleaved real and imaginary parts
+      __m256d vec1 = _mm256_load_pd(reinterpret_cast<const double *>(&cx1[i]));
+      __m256d vec2 = _mm256_load_pd(reinterpret_cast<const double *>(&cx2[i]));
+
+      // auto res = mult_c128_avx2(vec1, vec2);
+      // _mm256_storeu_pd(reinterpret_cast<double *>(&out[i]), res);
+
+      auto vec3 = _mm256_mul_pd(vec1, vec2);
+      vec2 = _mm256_permute_pd(vec2, 0x5);
+      vec2 = _mm256_mul_pd(vec2, neg);
+      auto vec4 = _mm256_mul_pd(vec1, vec2);
+      vec1 = _mm256_hsub_pd(vec3, vec4);
+
+      _mm256_store_pd(reinterpret_cast<double *>(&out[i]), vec1);
+    }
+  }
+
+  // Remainder loop for scalar processing
+  for (size_t i = vec_end; i < vec_size; ++i) {
+    const auto a_1 = cx1[i].real();
+    const auto a_2 = cx1[i].imag();
+    const auto b_1 = cx2[i].real();
+    const auto b_2 = cx2[i].imag();
+    const auto real = a_1 * b_1 - a_2 * b_2;
+    const auto imag = a_2 * b_1 + a_1 * b_2;
+    out[i] = {real, imag};
+  }
+}
+
+#endif
+
 template <typename T>
 inline void multiply_cx_serial(std::span<const std::complex<T>> cx1,
                                std::span<const std::complex<T>> cx2,
@@ -219,20 +324,18 @@ inline void multiply_cx(std::span<const std::complex<T>> cx1,
   } else if constexpr (std::is_same_v<T, double>) {
     multiply_cx_serial(cx1, cx2, out);
   }
+
+#elif defined(__AVX2__)
+
+  multiply_cx_haswell<T>(cx1, cx2, out);
+
 #else
   multiply_cx_serial(cx1, cx2, out);
 #endif
 }
 
 template <typename T>
-inline void normalize_add_results_serial(T *out, T *real, size_t len, T fct) {
-  for (size_t i = 0; i < len; ++i) {
-    out[i] += real[i] * fct;
-  }
-}
-
-inline void normalize_add_results_serial_(float *out, float const *inp,
-                                          size_t n, float fct) {
+inline void normalize_add_serial(T *out, T const *inp, size_t n, T fct) {
   for (size_t i = 0; i < n; ++i) {
     out[i] += inp[i] * fct;
   }
@@ -278,7 +381,40 @@ inline void normalize_add_neon_f64(double *out, double const *inp, size_t n,
 
 #endif
 
-template <typename T> void normalize_add(T *out, T *inp, size_t n, T fct) {
+#if defined(__AVX2__)
+
+#include <immintrin.h>
+
+template <typename T>
+inline void normalize_add_haswell(T *out, T const *inp, size_t n, T fct) {
+  constexpr size_t simd_width = 256 / (8 * sizeof(T));
+  size_t vec_end = n / simd_width * simd_width;
+
+  if constexpr (std::is_same_v<T, float>) {
+    __m256 fct_vec = _mm256_set1_ps(fct);
+    for (size_t i = 0; i < vec_end; i += simd_width) {
+      __m256 inp_vec = _mm256_load_ps(inp + i);
+      __m256 out_vec = _mm256_load_ps(out + i);
+      _mm256_store_ps(out + i, _mm256_fmadd_ps(inp_vec, fct_vec, out_vec));
+    }
+  } else if constexpr (std::is_same_v<T, double>) {
+    __m256d fct_vec = _mm256_set1_pd(fct);
+    for (size_t i = 0; i < vec_end; i += simd_width) {
+      __m256d inp_vec = _mm256_load_pd(inp + i);
+      __m256d out_vec = _mm256_load_pd(out + i);
+      _mm256_store_pd(out + i, _mm256_fmadd_pd(inp_vec, fct_vec, out_vec));
+    }
+  }
+
+  for (size_t i = vec_end; i < n; ++i) {
+    out[i] += inp[i] * fct;
+  }
+}
+
+#endif
+
+template <typename T>
+void normalize_add(T *out, T const *inp, size_t n, T fct) {
 
 #if defined(__ARM_NEON__)
   if constexpr (std::is_same_v<T, float>) {
@@ -288,8 +424,12 @@ template <typename T> void normalize_add(T *out, T *inp, size_t n, T fct) {
   } else {
     static_assert(false, "Not implemented");
   }
+
+#elif defined(__AVX2__)
+  normalize_add_haswell<T>(out, inp, n, fct);
+
 #else
-  normalize_add_results_serial<T>(out, inp, n, fct);
+  normalize_add_serial<T>(out, inp, n, fct);
 #endif
 }
 

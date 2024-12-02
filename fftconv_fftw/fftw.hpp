@@ -37,7 +37,8 @@ struct FFTWGlobalSetup {
   }
 };
 
-constexpr int DEFAULT_PLANNER_FLAG = FFTW_EXHAUSTIVE;
+// constexpr int DEFAULT_PLANNER_FLAG = FFTW_EXHAUSTIVE;
+constexpr int DEFAULT_PLANNER_FLAG = FFTW_ESTIMATE;
 
 template <typename T>
 concept FloatOrDouble = std::is_same_v<T, float> || std::is_same_v<T, double>;
