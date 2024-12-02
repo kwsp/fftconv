@@ -69,7 +69,7 @@ void conv_bench_same(benchmark::State &state, Func conv_func) {
 // const std::vector<std::vector<int64_t>> args{
 //     {{1000, 1664, 2304, 2816, 3326, 4352}, {15, 35, 65, 95}}};
 
-const std::vector<std::vector<int64_t>> args{{{2304, 4352}, {65, 95}}};
+const std::vector<std::vector<int64_t>> args{{{2304, 4352}, {95}}};
 
 template <fftconv::FloatOrDouble Real>
 void BM_oaconvolve(benchmark::State &state) {

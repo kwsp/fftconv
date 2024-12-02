@@ -145,25 +145,152 @@ inline void elementwise_multiply_fftw_cx(std::span<const T> complex1,
   }
 }
 
-template <typename T>
-inline void elementwise_multiply_cx(std::span<const std::complex<T>> complex1,
-                                    std::span<const std::complex<T>> complex2,
-                                    std::span<std::complex<T>> result) {
-  // implement naive complex multiply. This is much faster than the
-  // std version, but doesn't handle infinities.
-  // https://stackoverflow.com/questions/49438158/why-is-muldc3-called-when-two-stdcomplex-are-multiplied
+#if defined(__ARM_NEON__)
+#include <arm_neon.h>
 
-  const auto size = std::min(complex1.size(), complex2.size());
-#pragma clang loop vectorize(enable)
-  for (size_t i = 0; i < size; ++i) {
-    const auto a_1 = complex1[i].real();
-    const auto a_2 = complex1[i].imag();
-    const auto b_1 = complex2[i].real();
-    const auto b_2 = complex2[i].imag();
+inline void multiply_cx_neon_f32(std::span<const std::complex<float>> cx1,
+                                 std::span<const std::complex<float>> cx2,
+                                 std::span<std::complex<float>> result) {
+  const size_t size = std::min(cx1.size(), cx2.size());
+  const size_t step =
+      4; // NEON can process 4 floats at a time (2 complex numbers)
+
+  size_t i = 0;
+  for (; i + step <= size; i += step) {
+    // Load interleaved real and imaginary parts
+    float32x4x2_t c1 =
+        vld2q_f32(reinterpret_cast<const float *>(cx1.data() + i));
+    float32x4x2_t c2 =
+        vld2q_f32(reinterpret_cast<const float *>(cx2.data() + i));
+
+    // Perform complex multiplication
+    float32x4_t real_part =
+        vmlsq_f32(vmulq_f32(c1.val[0], c2.val[0]), c1.val[1], c2.val[1]);
+    float32x4_t imag_part =
+        vmlaq_f32(vmulq_f32(c1.val[1], c2.val[0]), c1.val[0], c2.val[1]);
+
+    // Interleave results back into complex form
+    float32x4x2_t result_vec = {real_part, imag_part};
+
+    // Store result
+    vst2q_f32(reinterpret_cast<float *>(result.data() + i), result_vec);
+  }
+
+  // Handle remaining elements (scalar fallback)
+  for (; i < size; ++i) {
+    const auto a_1 = cx1[i].real();
+    const auto a_2 = cx1[i].imag();
+    const auto b_1 = cx2[i].real();
+    const auto b_2 = cx2[i].imag();
     const auto real = a_1 * b_1 - a_2 * b_2;
     const auto imag = a_2 * b_1 + a_1 * b_2;
     result[i] = {real, imag};
   }
+}
+#endif
+
+template <typename T>
+inline void multiply_cx_serial(std::span<const std::complex<T>> cx1,
+                               std::span<const std::complex<T>> cx2,
+                               std::span<std::complex<T>> out) {
+  // implement naive complex multiply. This is much faster than the
+  // std version, but doesn't handle infinities.
+  // https://stackoverflow.com/questions/49438158/why-is-muldc3-called-when-two-stdcomplex-are-multiplied
+
+  const auto size = std::min(cx1.size(), cx2.size());
+  for (size_t i = 0; i < size; ++i) {
+    const auto a_1 = cx1[i].real();
+    const auto a_2 = cx1[i].imag();
+    const auto b_1 = cx2[i].real();
+    const auto b_2 = cx2[i].imag();
+    const auto real = a_1 * b_1 - a_2 * b_2;
+    const auto imag = a_2 * b_1 + a_1 * b_2;
+    out[i] = {real, imag};
+  }
+}
+
+template <typename T>
+inline void multiply_cx(std::span<const std::complex<T>> cx1,
+                        std::span<const std::complex<T>> cx2,
+                        std::span<std::complex<T>> out) {
+#if defined(__ARM_NEON__)
+  if constexpr (std::is_same_v<T, float>) {
+    multiply_cx_neon_f32(cx1, cx2, out);
+  } else if constexpr (std::is_same_v<T, double>) {
+    multiply_cx_serial(cx1, cx2, out);
+  }
+#else
+  elementwise_multiply_cx_serial(cx1, cx2, out);
+#endif
+}
+
+template <typename T>
+inline void normalize_add_results_serial(T *out, T *real, size_t len, T fct) {
+  for (size_t i = 0; i < len; ++i) {
+    out[i] += real[i] * fct;
+  }
+}
+
+inline void normalize_add_results_serial_(float *out, float const *inp,
+                                          size_t n, float fct) {
+  for (size_t i = 0; i < n; ++i) {
+    out[i] += inp[i] * fct;
+  }
+}
+
+#if defined(__ARM_NEON__)
+
+#include <arm_neon.h>
+
+inline void normalize_add_neon_f32(float *out, float const *inp, size_t n,
+                                   float fct) {
+  const float32x4_t fct_vec = vdupq_n_f32(fct);
+  constexpr size_t n_step = 4;
+
+  size_t i = 0;
+  for (; i + n_step <= n; i += n_step) {
+    float32x4_t out_vec = vld1q_f32(out + i);
+    float32x4_t inp_vec = vld1q_f32(inp + i);
+    out_vec = vfmaq_f32(out_vec, inp_vec, fct_vec);
+    vst1q_f32(out + i, out_vec);
+  }
+  for (; i < n; ++i) {
+    out[i] += inp[i] * fct;
+  }
+}
+
+inline void normalize_add_neon_f64(double *out, double const *inp, size_t n,
+                                   double fct) {
+  const float64x2_t fct_vec = vdupq_n_f64(fct);
+  constexpr size_t n_step = 2;
+
+  size_t i = 0;
+  for (; i + n_step <= n; i += n_step) {
+    auto out_vec = vld1q_f64(out + i);
+    auto inp_vec = vld1q_f64(inp + i);
+    out_vec = vfmaq_f64(out_vec, inp_vec, fct_vec);
+    vst1q_f64(out + i, out_vec);
+  }
+  for (; i < n; ++i) {
+    out[i] += inp[i] * fct;
+  }
+}
+
+#endif
+
+template <typename T> void normalize_add(T *out, T *inp, size_t n, T fct) {
+
+#if defined(__ARM_NEON__)
+  if constexpr (std::is_same_v<T, float>) {
+    normalize_add_neon_f32(out, inp, n, fct);
+  } else if constexpr (std::is_same_v<T, double>) {
+    normalize_add_neon_f64(out, inp, n, fct);
+  } else {
+    static_assert(false, "Not implemented");
+  }
+#else
+  normalize_add_results_serial<T>(out, inp, n, fct);
+#endif
 }
 
 template <FloatOrDouble Real> struct PlansBase {
@@ -273,7 +400,7 @@ public:
     plans.forward(real, complex2);
 
     // Complex elementwise multiple, A = A * B
-    internal::elementwise_multiply_cx<Real>(complex1, complex2, complex1);
+    internal::multiply_cx<Real>(complex1, complex2, complex1);
 
     // a = ifft(A)
     plans.backward(complex1, real);
@@ -310,15 +437,13 @@ public:
       internal::copy_to_padded_buffer<Real>(input.subspan(pos, len), real_span);
       plans.forward(real, complex1);
 
-      internal::elementwise_multiply_cx<Real>(complex1, complex2, complex1);
+      internal::multiply_cx<Real>(complex1, complex2, complex1);
 
       plans.backward(complex1, real);
 
       // normalize output and add to result
       len = std::min<size_t>(output.size() - pos, fft_size);
-      for (size_t i = 0; i < len; ++i) {
-        output[pos + i] += real[i] * fct;
-      }
+      internal::normalize_add<Real>(output.data() + pos, real.data(), len, fct);
     }
   }
 
@@ -350,7 +475,7 @@ public:
       internal::copy_to_padded_buffer<Real>(input.subspan(pos, len), real_span);
       plans.forward(real, complex1);
 
-      internal::elementwise_multiply_cx<Real>(complex1, complex2, complex1);
+      internal::multiply_cx<Real>(complex1, complex2, complex1);
 
       plans.backward(complex1, real);
 
@@ -358,10 +483,10 @@ public:
       const int64_t loop_start = std::max<int64_t>(copy_start - pos, 0LL);
       const int64_t loop_end =
           std::min<int64_t>(output.size() - pos + copy_start, fft_size);
-      for (size_t i = loop_start; i < loop_end; ++i) {
-        const auto res_idx = pos + i - copy_start;
-        output[res_idx] += real[i] * fct;
-      }
+      const int64_t n = loop_end - loop_start;
+      internal::normalize_add<Real>(
+          output.data() + pos - copy_start + loop_start,
+          real.data() + loop_start, loop_end - loop_start, fct);
     }
   }
 

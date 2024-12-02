@@ -115,8 +115,7 @@ TEST(ElementwiseMultiplyTest, CorrectMultiplication) {
   fftconv::fftw_buffer<std::complex<double>> result(2);
 
   // Perform element-wise multiplication
-  fftconv::internal::elementwise_multiply_cx<double>(complex1, complex2,
-                                                     result);
+  fftconv::internal::multiply_cx<double>(complex1, complex2, result);
 
   // Verify the results
   EXPECT_DOUBLE_EQ(result[0].real(), -7);  // (1*5 - 2*6) = 5 - 12 = -7
@@ -141,8 +140,7 @@ TEST(ElementwiseMultiplyTest, HandlesDifferentSizes) {
   fftconv::fftw_buffer<std::complex<double>> result(3);
 
   // Perform element-wise multiplication
-  fftconv::internal::elementwise_multiply_cx<double>(complex1, complex2,
-                                                     result);
+  fftconv::internal::multiply_cx<double>(complex1, complex2, result);
 
   // Only the first 2 elements should be computed
   EXPECT_DOUBLE_EQ(result[0].real(), 2);
