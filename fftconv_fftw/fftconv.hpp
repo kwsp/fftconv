@@ -2,16 +2,15 @@
 // 2022 - 2024
 // https://github.com/kwsp/fftconv
 //
-// Version 0.2.1
+// Version 0.3.0
 #pragma once
 
 #include "fftw.hpp"
-
 #include <array>
 #include <cassert>
 #include <complex>
 #include <memory>
-// #include <mutex>
+#include <ranges>
 #include <span>
 #include <type_traits>
 #include <unordered_map>
@@ -19,8 +18,7 @@
 // NOLINTBEGIN(*-reinterpret-cast, *-const-cast)
 
 namespace fftconv {
-using fftw::fftw_buffer;
-using fftw::FloatOrDouble;
+using fftw::Floating;
 using fftw::Plan;
 
 namespace internal {
@@ -104,11 +102,10 @@ inline void copy_to_padded_buffer(const std::span<const Tin> src,
   assert(src.size() <= dst.size());
 
   // Copy data from source to destination
-  std::copy(src.begin(), src.end(), dst.begin());
+  std::ranges::copy(src, dst.begin());
 
   // Fill the remaining part of the destination with zeros
-  auto dst_rest = dst.subspan(src.size());
-  std::fill(dst_rest.begin(), dst_rest.end(), 0);
+  std::ranges::fill(dst.subspan(src.size()), 0);
 }
 
 // static inline void elementwise_multiply(const fftw_complex *a,
@@ -126,10 +123,11 @@ inline void copy_to_padded_buffer(const std::span<const Tin> src,
 //_res[i] = _a[i] * _b[i];
 //}
 
-template <fftw::FFTWComplex T>
-inline void elementwise_multiply_fftw_cx(std::span<const T> complex1,
-                                         std::span<const T> complex2,
-                                         std::span<T> result) {
+template <Floating T>
+inline void
+elementwise_multiply_fftw_cx(std::span<const fftw::Complex<T>> complex1,
+                             std::span<const fftw::Complex<T>> complex2,
+                             std::span<fftw::Complex<T>> result) {
   // implement naive complex multiply. This is much faster than the
   // std version, but doesn't handle infinities.
   // https://stackoverflow.com/questions/49438158/why-is-muldc3-called-when-two-stdcomplex-are-multiplied
@@ -224,280 +222,169 @@ inline void multiply_cx(std::span<const std::complex<T>> cx1,
 #endif
 }
 
+// out = cx1 * cx2
 template <typename T>
-inline void normalize_add_results_serial(T *out, T *real, size_t len, T fct) {
-  for (size_t i = 0; i < len; ++i) {
-    out[i] += real[i] * fct;
-  }
+inline void multiply_cx(std::span<const fftw::Complex<T>> cx1,
+                        std::span<const fftw::Complex<T>> cx2,
+                        std::span<fftw::Complex<T>> out) {
+
+  multiply_cx(
+      std::span{reinterpret_cast<const std::complex<T> *>(cx1.data()),
+                cx1.size()},
+      std::span{reinterpret_cast<const std::complex<T> *>(cx2.data()),
+                cx2.size()},
+      std::span{reinterpret_cast<std::complex<T> *>(out.data()), out.size()});
 }
-
-inline void normalize_add_results_serial_(float *out, float const *inp,
-                                          size_t n, float fct) {
-  for (size_t i = 0; i < n; ++i) {
-    out[i] += inp[i] * fct;
-  }
-}
-
-#if defined(__ARM_NEON__)
-
-#include <arm_neon.h>
-
-inline void normalize_add_neon_f32(float *out, float const *inp, size_t n,
-                                   float fct) {
-  const float32x4_t fct_vec = vdupq_n_f32(fct);
-  constexpr size_t n_step = 4;
-
-  size_t i = 0;
-  for (; i + n_step <= n; i += n_step) {
-    float32x4_t out_vec = vld1q_f32(out + i);
-    float32x4_t inp_vec = vld1q_f32(inp + i);
-    out_vec = vfmaq_f32(out_vec, inp_vec, fct_vec);
-    vst1q_f32(out + i, out_vec);
-  }
-  for (; i < n; ++i) {
-    out[i] += inp[i] * fct;
-  }
-}
-
-inline void normalize_add_neon_f64(double *out, double const *inp, size_t n,
-                                   double fct) {
-  const float64x2_t fct_vec = vdupq_n_f64(fct);
-  constexpr size_t n_step = 2;
-
-  size_t i = 0;
-  for (; i + n_step <= n; i += n_step) {
-    auto out_vec = vld1q_f64(out + i);
-    auto inp_vec = vld1q_f64(inp + i);
-    out_vec = vfmaq_f64(out_vec, inp_vec, fct_vec);
-    vst1q_f64(out + i, out_vec);
-  }
-  for (; i < n; ++i) {
-    out[i] += inp[i] * fct;
-  }
-}
-
-#endif
-
-template <typename T> void normalize_add(T *out, T *inp, size_t n, T fct) {
-
-#if defined(__ARM_NEON__)
-  if constexpr (std::is_same_v<T, float>) {
-    normalize_add_neon_f32(out, inp, n, fct);
-  } else if constexpr (std::is_same_v<T, double>) {
-    normalize_add_neon_f64(out, inp, n, fct);
-  } else {
-    static_assert(false, "Not implemented");
-  }
-#else
-  normalize_add_results_serial<T>(out, inp, n, fct);
-#endif
-}
-
-template <FloatOrDouble Real> struct PlansBase {
-  using Cx = std::complex<Real>;
-
-  Plan<Real> plan_forward;
-  Plan<Real> plan_backward;
-
-  PlansBase(Plan<Real> &&forward, Plan<Real> &&backward)
-      : plan_forward(std::move(forward)), plan_backward(std::move(backward)) {}
-
-  PlansBase() = default;
-  PlansBase(PlansBase &&other) = delete;
-  PlansBase(const PlansBase &other) = delete;
-  auto operator=(PlansBase &&other) -> PlansBase = delete;
-  auto operator=(const PlansBase &other) -> PlansBase = delete;
-  ~PlansBase() = default;
-};
-
-template <FloatOrDouble Real> struct Plans1d : public PlansBase<Real> {
-  using Cx = std::complex<Real>;
-
-  explicit Plans1d(const fftw_buffer<Real> &real,
-                   const fftw_buffer<Cx> &complex)
-      : PlansBase<Real>(Plan<Real>::plan_dft_r2c_1d(real, complex),
-                        Plan<Real>::plan_dft_c2r_1d(complex, real)) {}
-
-  constexpr void forward(const fftw_buffer<Real> &real,
-                         fftw_buffer<Cx> &complex) const {
-    this->plan_forward.execute_dft_r2c(real, complex);
-  }
-
-  constexpr void backward(const fftw_buffer<Cx> &complex,
-                          fftw_buffer<Real> &real) const {
-    this->plan_backward.execute_dft_c2r(complex, real);
-  }
-};
-
-template <FloatOrDouble Real> struct Plans1dMany : public Plans1d<Real> {
-  using Cx = std::complex<Real>;
-
-  Plans1dMany(const fftw_buffer<Real> &real, const fftw_buffer<Cx> &complex,
-              int n_arrays) {
-    this->plan_forward = Plan<Real>::plan_many_dft_r2c(real, complex, n_arrays);
-    this->plan_backward =
-        Plan<Real>::plan_many_dft_c2r(complex, real, n_arrays);
-  }
-};
 
 } // namespace internal
 
-// // Since FFTW planners are not thread-safe, you can pass a pointer to a
-// // std::mutex to fftconv and all calls to the planner with be guarded by the
-// // mutex.
-// inline void use_fftw_mutex(std::mutex *fftw_mutex) {
-//   internal::fftconv_fftw_mutex = fftw_mutex;
-// }
-// inline auto get_fftw_mutex() -> std::mutex * {
-//   return internal::fftconv_fftw_mutex;
-// };
+template <typename T> struct FFTConvBuffer {
+  using Cx = fftw::Complex<T>;
 
-// fft_plans manages the memory of the forward and backward fft plans
+  std::span<T> real;
+  std::span<Cx> cx1;
+  std::span<Cx> cx2;
+
+  FFTConvBuffer(const FFTConvBuffer &) = delete;
+  FFTConvBuffer(FFTConvBuffer &&) = delete;
+  FFTConvBuffer &operator=(const FFTConvBuffer &) = delete;
+  FFTConvBuffer &operator=(FFTConvBuffer &&) = delete;
+
+  explicit FFTConvBuffer(size_t real_sz)
+      : real(fftw::alloc_real<T>(real_sz), real_sz),
+        cx1(fftw::alloc_complex<T>(real_sz / 2 + 1), real_sz / 2 + 1),
+        cx2(fftw::alloc_complex<T>(real_sz / 2 + 1), real_sz / 2 + 1) {}
+
+  ~FFTConvBuffer() {
+    fftw::free<T>(real.data());
+    fftw::free<T>(cx1.data());
+    fftw::free<T>(cx2.data());
+  }
+};
+
+// EngineFFTConv manages the memory of the forward and backward fft plans
 // and the fftw buffers
-//
-// Not using half complex transforms before it's non-trivial to do complex
-// multiplications with FFTW's half complex format
-template <fftw::FloatOrDouble Real> class fftconv_plans {
-public:
-  using Cx = std::complex<Real>;
+template <typename T>
+struct FFTConvEngine : public fftw::cache_mixin<FFTConvEngine<T>> {
+  using Plan = fftw::Plan<T>;
+  using Cx = fftw::Complex<T>;
+
+  FFTConvBuffer<T> buf;
+  Plan forward;
+  Plan backward;
+
+  // n is padded_length
+  explicit FFTConvEngine(size_t n)
+      : buf(n), forward(Plan::dft_r2c_1d(n, buf.real.data(), buf.cx1.data(),
+                                         fftw::FLAGS)),
+        backward(Plan::dft_c2r_1d(n, buf.cx1.data(), buf.real.data(),
+                                  fftw::FLAGS)) {}
 
   // Get the fftconv_plans object for a specific kernel size
-  static auto get(const size_t padded_length) -> auto & {
-    return *internal::get_cached<size_t, fftconv_plans<Real>>(padded_length);
+  static auto get_for_ksize(size_t ksize) -> FFTConvEngine<T> & {
+    const auto fft_size = internal::get_optimal_fft_size(ksize);
+    return FFTConvEngine<T>::get(fft_size);
   }
 
-  // Get the fftconv_plans object for a specific kernel size
-  static auto get_for_kernel(const std::span<const Real> kernel) -> auto & {
-    const auto fft_size = internal::get_optimal_fft_size(kernel.size());
-    return fftconv_plans<Real>::get(fft_size);
-  }
+  void convolve(const std::span<const T> input, const std::span<const T> kernel,
+                const std::span<T> output) {
+    std::fill(output.begin(), output.end(), static_cast<T>(0));
 
-  // Constructors
-  // Compute the fftw plans and allocate buffers
-  explicit fftconv_plans(const int padded_length)
-      : real(padded_length), complex1(padded_length / 2 + 1),
-        complex2(padded_length / 2 + 1), plans(real, complex1) {}
-
-  // Convolve real arrays a and b
-  // Results saved in real_buf
-  void convolve(const std::span<const Real> input,
-                const std::span<const Real> kernel,
-                const std::span<Real> output) {
-    std::fill(output.begin(), output.end(), static_cast<Real>(0));
-
-    std::span<Real> real_span(real);
-
-    // Copy a to buffer
-    internal::copy_to_padded_buffer<Real>(input, real_span);
+    // Copy input to buffer
+    // TODO assume input is aligned and don't copy
+    internal::copy_to_padded_buffer<T>(input, buf.real);
 
     // A = fft(a)
-    plans.forward(real, complex1);
+    forward.execute_dft_r2c(buf.real.data(), buf.cx1.data());
 
     // Copy b to buffer
-    internal::copy_to_padded_buffer<Real>(kernel, real_span);
+    internal::copy_to_padded_buffer<T>(kernel, buf.real);
 
     // B = fft(b)
-    plans.forward(real, complex2);
+    forward.execute_dft_r2c(buf.real.data(), buf.cx2.data());
 
     // Complex elementwise multiple, A = A * B
-    internal::multiply_cx<Real>(complex1, complex2, complex1);
+    internal::multiply_cx<T>(buf.cx1, buf.cx2, buf.cx1);
 
     // a = ifft(A)
-    plans.backward(complex1, real);
+    backward.execute_dft_c2r(buf.cx1.data(), buf.real.data());
 
     // divide each result elem by real_sz
-    for (size_t i = 0; i < real.size(); ++i) {
-      real[i] /= real.size();
-    }
+    fftw::normalize<T>(buf.real.data(), buf.real.size(), 1. / buf.real.size());
 
-    std::copy(real.begin(), real.end(), output.begin());
+    std::copy(buf.real.begin(), buf.real.end(), output.begin());
   }
 
-  void oaconvolve(const std::span<const Real> input,
-                  const std::span<const Real> kernel, std::span<Real> output) {
-    assert(real.size() == internal::get_optimal_fft_size(kernel.size()));
-    std::fill(output.begin(), output.end(), static_cast<Real>(0));
+  void oaconvolve_full(const std::span<const T> input,
+                       const std::span<const T> kernel, std::span<T> output) {
+    assert(buf.real.size() == internal::get_optimal_fft_size(kernel.size()));
+    std::fill(output.begin(), output.end(), 0);
+
+    const auto &real = buf.real;
+    const auto &cx1 = buf.cx1;
+    const auto &cx2 = buf.cx2;
 
     const auto fft_size = real.size();
     const auto step_size = fft_size - (kernel.size() - 1);
 
-    std::span<Real> real_span(real);
-
     // forward fft of kernel and save to complex2
-    internal::copy_to_padded_buffer<Real>(kernel, real_span);
-    plans.forward(real, complex2);
+    internal::copy_to_padded_buffer<T>(kernel, buf.real);
+    forward.execute_dft_r2c(real.data(), buf.cx2.data());
 
     // create forward/backward ffts for x
     // Normalization factor
-    const auto fct = static_cast<Real>(1. / fft_size);
+    const auto fct = static_cast<T>(1. / fft_size);
+    for (size_t pos = 0; pos < input.size(); pos += step_size) {
+      size_t len =
+          std::min<size_t>(input.size() - pos, step_size); // bound check
+      internal::copy_to_padded_buffer<T>(input.subspan(pos, len), buf.real);
+      forward.execute_dft_r2c(real.data(), buf.cx1.data());
+      internal::multiply_cx<T>(cx1, buf.cx2, buf.cx1);
+      backward.execute_dft_c2r(cx1.data(), buf.real.data());
+
+      // normalize output and add to result
+      fftw::normalize_add<T>(output.subspan(pos), real, fct);
+    }
+  }
+
+  void oaconvolve_same(const std::span<const T> input,
+                       const std::span<const T> kernel, std::span<T> output) {
+    assert(buf.real.size() == internal::get_optimal_fft_size(kernel.size()));
+    std::fill(output.begin(), output.end(), 0);
+
+    const auto &real = buf.real;
+    const auto &cx1 = buf.cx1;
+    const auto &cx2 = buf.cx2;
+
+    const auto fft_size = real.size();
+    const auto step_size = fft_size - (kernel.size() - 1);
+
+    // forward fft of kernel and save to complex2
+    internal::copy_to_padded_buffer<T>(kernel, real);
+    forward.execute_dft_r2c(real.data(), cx2.data());
+
+    const size_t padding = kernel.size() / 2;
+
+    // create forward/backward ffts for x
+    // Normalization factor
+    const auto fct = static_cast<T>(1. / fft_size);
     for (size_t pos = 0; pos < input.size(); pos += step_size) {
       size_t len =
           std::min<size_t>(input.size() - pos, step_size); // bound check
 
-      internal::copy_to_padded_buffer<Real>(input.subspan(pos, len), real_span);
-      plans.forward(real, complex1);
-
-      internal::multiply_cx<Real>(complex1, complex2, complex1);
-
-      plans.backward(complex1, real);
+      internal::copy_to_padded_buffer<T>(input.subspan(pos, len), real);
+      forward.execute_dft_r2c(real.data(), cx1.data());
+      internal::multiply_cx<T>(cx1, cx2, cx1);
+      backward.execute_dft_c2r(cx1.data(), real.data());
 
       // normalize output and add to result
-      len = std::min<size_t>(output.size() - pos, fft_size);
-      internal::normalize_add<Real>(output.data() + pos, real.data(), len, fct);
+      if (pos < padding) {
+        fftw::normalize_add<T>(output, real.subspan(padding), fct);
+      } else {
+        fftw::normalize_add<T>(output.subspan(pos - padding), real, fct);
+      }
     }
   }
-
-  void oaconvolve_same(const std::span<const Real> input,
-                       const std::span<const Real> kernel,
-                       std::span<Real> output) {
-    assert(real.size() == internal::get_optimal_fft_size(kernel.size()));
-    assert(input.size() == output.size());
-    std::fill(output.begin(), output.end(), static_cast<Real>(0));
-
-    const auto fft_size = real.size();
-    const auto step_size = fft_size - (kernel.size() - 1);
-
-    std::span<Real> real_span(real);
-
-    // forward fft of kernel and save to complex2
-    internal::copy_to_padded_buffer<Real>(kernel, real_span);
-    plans.forward(real, complex2);
-
-    const int64_t copy_start = kernel.size() / 2;
-
-    // create forward/backward ffts for x
-    // Normalization factor
-    const auto fct = static_cast<Real>(1. / fft_size);
-    const int64_t ksize_half = kernel.size() / 2;
-    for (int64_t pos = 0; pos < input.size(); pos += step_size) {
-      const int64_t len = std::min<size_t>(input.size() - pos, step_size);
-
-      internal::copy_to_padded_buffer<Real>(input.subspan(pos, len), real_span);
-      plans.forward(real, complex1);
-
-      internal::multiply_cx<Real>(complex1, complex2, complex1);
-
-      plans.backward(complex1, real);
-
-      // normalize output and add to result
-      const int64_t loop_start = std::max<int64_t>(copy_start - pos, 0LL);
-      const int64_t loop_end =
-          std::min<int64_t>(output.size() - pos + copy_start, fft_size);
-      const int64_t n = loop_end - loop_start;
-      internal::normalize_add<Real>(
-          output.data() + pos - copy_start + loop_start,
-          real.data() + loop_start, loop_end - loop_start, fct);
-    }
-  }
-
-private:
-  // FFTW buffers
-  fftw_buffer<Real> real;
-  fftw_buffer<Cx> complex1;
-  fftw_buffer<Cx> complex2;
-
-  // FFTW plans
-  internal::Plans1d<Real> plans;
 };
 
 // 1D convolution using the FFT
@@ -506,72 +393,62 @@ private:
 //    * Cache fftw_plan
 //    * Reuse buffers (no malloc on second call to the same convolution size)
 // https://en.wikipedia.org/w/index.php?title=Convolution#Fast_convolution_algorithms
-template <FloatOrDouble Real>
-void convolve_fftw(const std::span<const Real> input,
-                   const std::span<const Real> kernel, std::span<Real> output) {
+template <Floating T>
+void convolve_fftw(const std::span<const T> input,
+                   const std::span<const T> kernel, std::span<T> output) {
   // length of the real arrays, including the final convolution output
   const size_t padded_length = input.size() + kernel.size() - 1;
 
-  // Get cached plans
-  auto &plan = fftconv_plans<Real>::get(padded_length);
+  auto &plan = FFTConvEngine<T>::get(padded_length);
 
   // Execute FFT convolution and copy normalized result
   plan.convolve(input, kernel, output);
 }
 
-// 1D Overlap-Add convolution ("full" mode)
-//
-// input is a 1D signal
-// kernel is a kernel, input_size >> kernel_size
-// res is the results buffer. output_size >= input_size + kernel_size - 1
-//
-// 1. Split arr into blocks of step_size.
-// 2. convolve with kernel using fft of length N.
-// 3. add blocks together
-template <FloatOrDouble Real>
-void oaconvolve_fftw(const std::span<const Real> input,
-                     const std::span<const Real> kernel,
-                     std::span<Real> output) {
-  assert(input.size() + kernel.size() - 1 == output.size());
+enum ConvMode { Full, Same };
+
+/**
+1D Overlap-Add convolution
+// input_size >> kernel_size
+
+For "Full" mode, output_size >= input_size + kernel_size - 1
+For "Same" mode, output_size == input_size
+
+1. Split arr into blocks of step_size.
+2. convolve with kernel using fft of length N.
+3. add blocks together
+ */
+template <Floating T, ConvMode Mode = ConvMode::Full>
+void oaconvolve_fftw(std::span<const T> input, std::span<const T> kernel,
+                     std::span<T> output) {
+  if constexpr (Mode == ConvMode::Full) {
+    assert(input.size() + kernel.size() - 1 == output.size());
+  } else if constexpr (Mode == ConvMode::Same) {
+    assert(input.size() == output.size());
+  }
 
   // Get cached plans
-  auto &plan = fftconv_plans<Real>::get_for_kernel(kernel);
+  auto &plan = FFTConvEngine<T>::get_for_ksize(kernel.size());
 
   // Execute FFT convolution and copy normalized result
-  plan.oaconvolve(input, kernel, output);
-}
-
-// 1D Overlap-Add convolution ("same" mode)
-//
-// input is a 1D signal
-// kernel is a kernel, input_size >> kernel_size
-// res is the results buffer. output_size >= input_size + kernel_size - 1
-//
-// 1. Split arr into blocks of step_size.
-// 2. convolve with kernel using fft of length N.
-// 3. add blocks together
-template <FloatOrDouble Real>
-void oaconvolve_fftw_same(const std::span<const Real> input,
-                          const std::span<const Real> kernel,
-                          std::span<Real> output) {
-  assert(input.size() == output.size());
-
-  // Get cached plans
-  auto &plan = fftconv_plans<Real>::get_for_kernel(kernel);
-
-  // Execute FFT convolution and copy normalized result
-  plan.oaconvolve_same(input, kernel, output);
+  if constexpr (Mode == ConvMode::Full) {
+    plan.oaconvolve_full(input, kernel, output);
+  } else if constexpr (Mode == ConvMode::Same) {
+    plan.oaconvolve_same(input, kernel, output);
+  } else {
+    static_assert(false, "Unsupported mode.");
+  }
 }
 
 // Reference implementation of fft convolution with minimal optimizations
 // Only supports double
-template <FloatOrDouble Real>
+template <Floating T>
 void convolve_fftw_ref(const std::span<const double> input,
                        const std::span<const double> kernel,
                        std::span<double> output)
-  requires(std::is_same_v<Real, double>)
+  requires(std::is_same_v<T, double>)
 {
-  std::fill(output.begin(), output.end(), static_cast<Real>(0));
+  std::fill(output.begin(), output.end(), static_cast<T>(0));
 
   // length of the real arrays, including the final convolution output
   const size_t padded_length = input.size() + kernel.size() - 1;
@@ -613,7 +490,7 @@ void convolve_fftw_ref(const std::span<const double> input,
 
   // Perform element-wise product of FFT(a) and FFT(b)
   // then compute inverse fourier transform.
-  internal::elementwise_multiply_fftw_cx(
+  internal::elementwise_multiply_fftw_cx<T>(
       std::span<fftw_complex const>(A_buf, complex_length),
       std::span<fftw_complex const>(B_buf, complex_length),
       std::span(input_buffer, complex_length));

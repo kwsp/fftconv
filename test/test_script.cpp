@@ -13,7 +13,7 @@
 
 constexpr int N_RUNS = 5000;
 
-template <fftconv::FloatOrDouble T>
+template <fftconv::Floating T>
 void bench(const arma::Col<T> &input, const arma::Col<T> &kernel) {
   arma::Col<T> output(input.size() + kernel.size() - 1);
 
@@ -59,9 +59,9 @@ template <typename T> void run_bench() {
       // Test fftconv against armadillo
 
       arma::Col<T> res(size1, arma::fill::zeros);
-      fftconv::oaconvolve_fftw_same(std::span<const T>(input),
-                                    std::span<const T>(kernel),
-                                    std::span<T>(res));
+      fftconv::oaconvolve_fftw<T, fftconv::Same>(std::span<const T>(input),
+                                                 std::span<const T>(kernel),
+                                                 std::span<T>(res));
 
       const auto equal = arma::approx_equal(res, expected_arma, "absdiff", tol);
       if (!equal) {
@@ -76,7 +76,7 @@ template <typename T> void run_bench() {
 };
 
 auto main() -> int {
-  fftw::FFTWGlobalSetup _fftwSetup;
+  fftw::WisdomSetup wisdom(false);
 
   std::cout << "Testing double ...\n";
   run_bench<double>();

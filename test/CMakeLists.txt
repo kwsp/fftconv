@@ -37,6 +37,7 @@ target_link_libraries(test_fftconv
     PRIVATE
     armadillo
     fftconv
+    fmt::fmt
     GTest::gtest
     GTest::gtest_main
 )
