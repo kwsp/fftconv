@@ -1,1 +1,1 @@
-Checks: "-*,bugprone-*,cppcoreguidelines-*,modernize-*,performance-*,readability-*,google-*,-bugprone-easily-swappable-parameters,-*-trailing-return-type,-*-named-parameter"
+Checks: "-*,bugprone-*,cppcoreguidelines-*,modernize-*,performance-*,readability-*,google-*,-bugprone-easily-swappable-parameters,-*-trailing-return-type,-*-named-parameter,-*-identifier-length"
