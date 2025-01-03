@@ -6,7 +6,8 @@ Aligned allocator and vector from https://stackoverflow.com/a/70994249/12734467
 #include <limits>
 #include <new>
 
-// NOLINTBEGIN(*-reinterpret-cast, *magic-numbers, *-special-member-functions, *-redundant-access-specifiers)
+// NOLINTBEGIN(*-reinterpret-cast, *magic-numbers, *-special-member-functions,
+// *-redundant-access-specifiers)
 
 /**
  * Returns aligned pointers when allocations are requested. Default alignment
@@ -71,4 +72,5 @@ public:
 template <typename T, std::size_t ALIGNMENT_IN_BYTES = 64>
 using AlignedVector = std::vector<T, AlignedAllocator<T, ALIGNMENT_IN_BYTES>>;
 
-// NOLINTEND(*-reinterpret-cast, *magic-numbers, *-special-member-functions, *-redundant-access-specifiers)
+// NOLINTEND(*-reinterpret-cast, *magic-numbers, *-special-member-functions,
+// *-redundant-access-specifiers)

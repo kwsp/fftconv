@@ -1,14 +1,14 @@
 // Author: Taylor Nie
-// 2022 - 2024
+// 2022 - 2025
 // https://github.com/kwsp/fftconv
 //
-// Version 0.3.0
+// Version 0.4.0
 #pragma once
 
-#include "fftw.hpp"
 #include <array>
 #include <cassert>
 #include <complex>
+#include <fftconv/fftw.hpp>
 #include <memory>
 #include <ranges> // IWYU pragma: keep
 #include <span>
