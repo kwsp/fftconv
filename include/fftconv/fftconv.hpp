@@ -531,22 +531,18 @@ For "Same" mode, output_size == input_size
 2. convolve with kernel using fft of length N.
 3. add blocks together
  */
-template <Floating T, ConvMode Mode = ConvMode::Full>
+template <Floating T, ConvMode Mode = ConvMode::Same>
 void oaconvolve_fftw(std::span<const T> input, std::span<const T> kernel,
                      std::span<T> output) {
-  if constexpr (Mode == ConvMode::Full) {
-    assert(input.size() + kernel.size() - 1 == output.size());
-  } else if constexpr (Mode == ConvMode::Same) {
-    assert(input.size() == output.size());
-  }
-
   // Get cached plans
   auto &plan = FFTConvEngine<T>::get_for_ksize(kernel.size());
 
   // Execute FFT convolution and copy normalized result
   if constexpr (Mode == ConvMode::Full) {
+    assert(input.size() + kernel.size() - 1 == output.size());
     plan.oaconvolve_full(input, kernel, output);
   } else if constexpr (Mode == ConvMode::Same) {
+    assert(input.size() == output.size());
     plan.oaconvolve_same(input, kernel, output);
   } else {
     static_assert(false, "Unsupported mode.");
