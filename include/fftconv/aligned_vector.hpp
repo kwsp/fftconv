@@ -6,6 +6,8 @@ Aligned allocator and vector from https://stackoverflow.com/a/70994249/12734467
 #include <limits>
 #include <new>
 
+// NOLINTBEGIN(*-reinterpret-cast, *magic-numbers, *-special-member-functions, *-redundant-access-specifiers)
+
 /**
  * Returns aligned pointers when allocations are requested. Default alignment
  * is 64B = 512b, sufficient for AVX-512 and most cache line sizes.
@@ -40,7 +42,7 @@ public:
   constexpr AlignedAllocator(const AlignedAllocator &) noexcept = default;
 
   template <typename U>
-  constexpr AlignedAllocator(
+  constexpr explicit AlignedAllocator(
       AlignedAllocator<U, ALIGNMENT_IN_BYTES> const &) noexcept {}
 
   [[nodiscard]] ElementType *allocate(std::size_t nElementsToAllocate) {
@@ -66,5 +68,7 @@ public:
 
 #include <vector>
 
-template <typename T, std::size_t ALIGNMENT_IN_BYTES = 32>
+template <typename T, std::size_t ALIGNMENT_IN_BYTES = 64>
 using AlignedVector = std::vector<T, AlignedAllocator<T, ALIGNMENT_IN_BYTES>>;
+
+// NOLINTEND(*-reinterpret-cast, *magic-numbers, *-special-member-functions, *-redundant-access-specifiers)
