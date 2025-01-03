@@ -2,7 +2,7 @@
 
 Extremely fast CPU 1D convolutions. [Faster than Intel IPP and Apple Accelerate on their respective platforms](https://github.com/kwsp/microbenchmarks/tree/main/src/conv1d)
 
-*Kernel size = 245*
+_Kernel size = 245_
 
 <p align="center">
   <img src="https://github.com/kwsp/microbenchmarks/blob/main/src/conv1d/plots/Conv1d%20Throughput%20Bar%20(k%3D245)%2013th%20Gen%20Intel(R)%20Core(TM)%20i9-13900K.svg" width="45%">
@@ -73,8 +73,6 @@ The `test_fftconv` binary gives an easy benchmark that runs every test case 5000
 
 Output from `bench_fftconv` (accurate bench) raw result saved in `./bench_result.json`. Plot generated from `plot_bench.py`:
 
-![Comparison of the Overlap-Add method implemented with `fftw`, `pocketfft`, and `pocketfft_hdronly`](./bench_2022-08-21T23-11-01.svg)
-
 Output from `test_fftconv` (simple bench)
 
 ```
@@ -83,37 +81,21 @@ Output from `test_fftconv` (simple bench)
 All tests passed.
     (5000 runs) convolve_fftw took 82ms
     (5000 runs) oaconvolve_fftw took 36ms
-    (5000 runs) convolve_pocketfft took 91ms
-    (5000 runs) oaconvolve_pocketfft took 70ms
-    (5000 runs) convolve_pocketfft_hdr took 111ms
-    (5000 runs) oaconvolve_pocketfft_hdr took 105ms
     (5000 runs) convolve_armadillo took 108ms
 === test case (2816, 65) ===
 All tests passed.
     (5000 runs) convolve_fftw took 111ms
     (5000 runs) oaconvolve_fftw took 60ms
-    (5000 runs) convolve_pocketfft took 157ms
-    (5000 runs) oaconvolve_pocketfft took 115ms
-    (5000 runs) convolve_pocketfft_hdr took 187ms
-    (5000 runs) oaconvolve_pocketfft_hdr took 166ms
     (5000 runs) convolve_armadillo took 174ms
 === test case (2304, 65) ===
 All tests passed.
     (5000 runs) convolve_fftw took 536ms
     (5000 runs) oaconvolve_fftw took 52ms
-    (5000 runs) convolve_pocketfft took 175ms
-    (5000 runs) oaconvolve_pocketfft took 98ms
-    (5000 runs) convolve_pocketfft_hdr took 206ms
-    (5000 runs) oaconvolve_pocketfft_hdr took 143ms
     (5000 runs) convolve_armadillo took 147ms
 === test case (4352, 65) ===
 All tests passed.
     (5000 runs) convolve_fftw took 335ms
     (5000 runs) oaconvolve_fftw took 86ms
-    (5000 runs) convolve_pocketfft took 319ms
-    (5000 runs) oaconvolve_pocketfft took 165ms
-    (5000 runs) convolve_pocketfft_hdr took 369ms
-    (5000 runs) oaconvolve_pocketfft_hdr took 235ms
     (5000 runs) convolve_armadillo took 276ms
 ```
 
@@ -124,9 +106,7 @@ All tests passed.
 === test case (1664, 65) ===
 Vectors are equal.
     (5000 runs) convolve_fftw took 73ms
-    (5000 runs) convolve_pocketfft took 70ms
     (5000 runs) oaconvolve_fftw took 38ms
-    (5000 runs) oaconvolve_pocketfft took 53ms
     (5000 runs) np.convolve took 140ms
     (5000 runs) numba.njit(np.convolve) took 1409ms
     (5000 runs) scipy.signal.convolve took 162ms
@@ -135,9 +115,7 @@ Vectors are equal.
 === test case (2816, 65) ===
 Vectors are equal.
     (5000 runs) convolve_fftw took 96ms
-    (5000 runs) convolve_pocketfft took 110ms
     (5000 runs) oaconvolve_fftw took 60ms
-    (5000 runs) oaconvolve_pocketfft took 84ms
     (5000 runs) np.convolve took 236ms
     (5000 runs) numba.njit(np.convolve) took 2883ms
     (5000 runs) scipy.signal.convolve took 256ms
@@ -146,9 +124,7 @@ Vectors are equal.
 === test case (2304, 65) ===
 Vectors are equal.
     (5000 runs) convolve_fftw took 281ms
-    (5000 runs) convolve_pocketfft took 132ms
     (5000 runs) oaconvolve_fftw took 53ms
-    (5000 runs) oaconvolve_pocketfft took 75ms
     (5000 runs) np.convolve took 194ms
     (5000 runs) numba.njit(np.convolve) took 2215ms
     (5000 runs) scipy.signal.convolve took 213ms
@@ -157,9 +133,7 @@ Vectors are equal.
 === test case (4352, 65) ===
 Vectors are equal.
     (5000 runs) convolve_fftw took 326ms
-    (5000 runs) convolve_pocketfft took 215ms
     (5000 runs) oaconvolve_fftw took 82ms
-    (5000 runs) oaconvolve_pocketfft took 117ms
     (5000 runs) np.convolve took 358ms
     (5000 runs) numba.njit(np.convolve) took 3657ms
     (5000 runs) scipy.signal.convolve took 378ms

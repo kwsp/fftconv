@@ -7,10 +7,6 @@ project(fftconv C CXX)
 # only works for Makefile and Ninja
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON) 
 
-# Build fftconv
-add_subdirectory(fftconv_fftw)
-add_subdirectory(fftconv_pocketfft)
-
 # Build test
 add_subdirectory(test)
 

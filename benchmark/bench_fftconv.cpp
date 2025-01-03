@@ -2,9 +2,8 @@
 #include <benchmark/benchmark.h>
 #include <span>
 
-#include "fftconv.hpp"
-#include "fftw.hpp"
-// #include "fftconv_pocket.hpp"
+#include <fftconv/fftconv.hpp>
+#include <fftconv/fftw.hpp>
 
 // NOLINTBEGIN(*-identifier-length)
 

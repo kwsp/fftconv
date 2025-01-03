@@ -10,7 +10,7 @@
 #include <cassert>
 #include <complex>
 #include <memory>
-#include <ranges>
+#include <ranges> // IWYU pragma: keep
 #include <span>
 #include <type_traits>
 #include <unordered_map>
@@ -20,6 +20,11 @@
 namespace fftconv {
 using fftw::Floating;
 using fftw::Plan;
+
+// Function to check if a pointer is SIMD-aligned
+template <std::size_t Alignment> bool isSIMDAligned(const void *ptr) {
+  return reinterpret_cast<std::uintptr_t>(ptr) % Alignment == 0;
+}
 
 namespace internal {
 
@@ -400,7 +405,6 @@ struct FFTConvEngine : public fftw::cache_mixin<FFTConvEngine<T>> {
     std::fill(output.begin(), output.end(), static_cast<T>(0));
 
     // Copy input to buffer
-    // TODO assume input is aligned and don't copy
     internal::copy_to_padded_buffer<T>(input, buf.real);
 
     // A = fft(a)

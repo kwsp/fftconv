@@ -13,12 +13,7 @@ def test_conv(x, y):
         np.allclose(gt, func(x, y))
 
     _test(fftconv.convolve_fftw)
-    _test(fftconv.convolve_pocketfft)
-    # _test(fftconv.convolve_pocketfft_hdr)
-
     _test(fftconv.oaconvolve_fftw)
-    _test(fftconv.oaconvolve_pocketfft)
-    # _test(fftconv.oaconvolve_pocketfft_hdr)
 
     print("Vectors are equal.")
 
@@ -40,12 +35,8 @@ def run_bench(x, y):
         print(f"    ({N_RUNS} runs) {name} took {round(elapsed_ms)}ms")
 
     _timeit("convolve_fftw", lambda: fftconv.convolve_fftw(x, y))
-    _timeit("convolve_pocketfft", lambda: fftconv.convolve_pocketfft(x, y))
-    # _timeit("convolve_pocketfft_hdr", lambda: fftconv.convolve_pocketfft_hdr(x, y))
 
     _timeit("oaconvolve_fftw", lambda: fftconv.oaconvolve_fftw(x, y))
-    _timeit("oaconvolve_pocketfft", lambda: fftconv.oaconvolve_pocketfft(x, y))
-    # _timeit("oaconvolve_pocketfft_hdr", lambda: fftconv.oaconvolve_pocketfft_hdr(x, y))
 
     numba_convolve(x, y)  # warm jit
     _timeit("np.convolve", lambda: np.convolve(x, y))

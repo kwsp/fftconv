@@ -6,10 +6,9 @@
 #include <iostream>
 #include <span>
 
-#include "fftconv.hpp" // fftw impl
-#include "fftw.hpp"
-// #include "fftconv_pocket.hpp" // pocketfft impl
 #include "test_helpers.hpp"
+#include <fftconv/fftconv.hpp>
+#include <fftconv/fftw.hpp>
 
 constexpr int N_RUNS = 5000;
 

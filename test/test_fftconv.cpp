@@ -8,7 +8,7 @@
 #include <span>
 #include <vector>
 
-#include "fftconv.hpp"
+#include <fftconv/fftconv.hpp>
 
 #include "test_common.hpp"
 
@@ -110,7 +110,7 @@ template <> struct Tol<double> {
   auto operator()() { return DoubleTol; }
 };
 
-TEST(EngineFFTConv, ExecutesOAConvFull) {
+TEST(FFTConvEngine, ExecutesOAConvFull) {
   using T = double;
   arma::Col<T> kernel(95, arma::fill::randn);
 
@@ -136,7 +136,7 @@ TEST(EngineFFTConv, ExecutesOAConvFull) {
   }
 }
 
-TEST(EngineFFTConv, ExecutesOAConvSame) {
+TEST(FFTConvEngine, ExecutesOAConvSame) {
   using T = double;
   arma::Col<T> kernel(95, arma::fill::randn);
 
