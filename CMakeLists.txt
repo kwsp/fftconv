@@ -12,3 +12,6 @@ add_subdirectory(test)
 
 # Build benchmark
 add_subdirectory(benchmark)
+
+# Build python bindings
+add_subdirectory(pyfftconv)

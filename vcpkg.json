@@ -2,21 +2,27 @@
   "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json",
   "name": "fftconv",
   "version": "0.2.1",
+  "builtin-baseline": "43d81795a513e2ca6648354786178714f33c8b6f",
   "dependencies": [
-    "fmt",
     "armadillo",
     "benchmark",
-    "gtest",
     {
       "name": "fftw3",
-      "platform": "x64",
-      "features": ["threads", "avx2"]
+      "features": [
+        "avx2",
+        "threads"
+      ],
+      "platform": "x64"
     },
     {
       "name": "fftw3",
-      "platform": "!x64",
-      "features": ["threads"]
-    }
-  ],
-  "builtin-baseline": "43d81795a513e2ca6648354786178714f33c8b6f"
+      "features": [
+        "threads"
+      ],
+      "platform": "!x64"
+    },
+    "fmt",
+    "gtest",
+    "pybind11"
+  ]
 }

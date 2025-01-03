@@ -1,8 +1,6 @@
 // Author: Taylor Nie
 // 2022 - 2025
 // https://github.com/kwsp/fftconv
-//
-// Version 0.4.0
 #pragma once
 
 #include <array>
@@ -16,6 +14,8 @@
 #include <unordered_map>
 
 // NOLINTBEGIN(*-reinterpret-cast, *-const-cast)
+
+#define FFTCONV_VERSION "0.5.0"
 
 namespace fftconv {
 using fftw::Floating;
