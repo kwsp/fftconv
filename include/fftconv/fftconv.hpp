@@ -196,7 +196,7 @@ inline void multiply_cx_neon_f32(std::span<const std::complex<float>> cx1,
 
 #include <immintrin.h>
 
-__m256d mult_c128_avx2(__m256d vec1, __m256d vec2) {
+inline __m256d mult_c128_avx2(__m256d vec1, __m256d vec2) {
   // vec1 and vec2 each have 2 128bit complex
   const __m256d neg = _mm256_setr_pd(1.0, -1.0, 1.0, -1.0);
 
