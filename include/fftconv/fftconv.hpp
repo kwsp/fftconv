@@ -8,7 +8,6 @@
 #include <complex>
 #include <fftconv/fftw.hpp>
 #include <memory>
-#include <ranges> // IWYU pragma: keep
 #include <span>
 #include <type_traits>
 #include <unordered_map>
@@ -107,10 +106,11 @@ inline void copy_to_padded_buffer(const std::span<const Tin> src,
   assert(src.size() <= dst.size());
 
   // Copy data from source to destination
-  std::ranges::copy(src, dst.begin());
+  std::copy(src.begin(), src.end(), dst.begin());
 
   // Fill the remaining part of the destination with zeros
-  std::ranges::fill(dst.subspan(src.size()), 0);
+  auto dst_ = dst.subspan(src.size());
+  std::fill(dst_.begin(), dst_.end(), 0);
 }
 
 // static inline void elementwise_multiply(const fftw_complex *a,
@@ -545,7 +545,8 @@ void oaconvolve_fftw(std::span<const T> input, std::span<const T> kernel,
     assert(input.size() == output.size());
     plan.oaconvolve_same(input, kernel, output);
   } else {
-    static_assert(Mode == ConvMode::Full || Mode == ConvMode::Same, "Unsupported mode.");
+    static_assert(Mode == ConvMode::Full || Mode == ConvMode::Same,
+                  "Unsupported mode.");
   }
 }
 
