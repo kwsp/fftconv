@@ -93,7 +93,7 @@ Performs envelope detection using the Hilbert transform.
 Equivalent to `np.abs(signal.hilbert(a))`
 )delimiter";
 
-PYBIND11_MODULE(pyfftconv, m) {
+PYBIND11_MODULE(_pyfftconv, m) {
   m.doc() = "Python wrapper for fftconv";
   m.attr("__version__") = FFTCONV_VERSION;
 

@@ -14,4 +14,4 @@ add_subdirectory(test)
 add_subdirectory(benchmark)
 
 # Build python bindings
-add_subdirectory(pyfftconv)
+add_subdirectory(py)
