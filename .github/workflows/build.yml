@@ -1,0 +1,120 @@
+name: Build
+on:
+  push:
+    paths-ignore:
+      - "**/README.md"
+
+env:
+  USERNAME: kwsp
+  VCPKG_ROOT: ${{ github.workspace }}/vcpkg
+  VCPKG_EXE: ${{ github.workspace }}/vcpkg/vcpkg
+  FEED_URL: https://nuget.pkg.github.com/kwsp/index.json
+  VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite;nuget,https://nuget.pkg.github.com/kwsp/index.json,readwrite"
+
+jobs:
+  Build-Win64:
+    runs-on: windows-2022
+    steps:
+      - name: Export GitHub Actions cache environment variables
+        uses: actions/github-script@v7
+        with:
+          script: |
+            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Setup VCPKG
+        shell: pwsh
+        run: |
+          cd ${{ github.workspace }}
+          git clone https://github.com/microsoft/vcpkg
+          ${{ github.workspace }}/vcpkg/bootstrap-vcpkg.bat
+
+      - name: Add NuGet sources
+        shell: pwsh
+        run: |
+          .$(${{ env.VCPKG_EXE }} fetch nuget) `
+            sources add `
+            -Source "${{ env.FEED_URL }}" `
+            -StorePasswordInClearText `
+            -Name GitHubPackages `
+            -UserName "${{ env.USERNAME }}" `
+            -Password "${{ secrets.GH_PACKAGES_TOKEN }}"
+          .$(${{ env.VCPKG_EXE }} fetch nuget) `
+            setapikey "${{ secrets.GH_PACKAGES_TOKEN }}" `
+            -Source "${{ env.FEED_URL }}"
+
+      - name: CMake configure
+        run: cmake --preset win64
+
+      - name: CMake build
+        run: cmake --build --preset win64-release
+
+      - name: CTest
+        shell: bash
+        run: ctest --output-on-failure --test-dir build/win64/test/
+
+  Build-mac:
+    runs-on: macos-latest
+    steps:
+      - name: Export GitHub Actions cache environment variables
+        uses: actions/github-script@v7
+        with:
+          script: |
+            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Install system-wide build tools
+        shell: bash
+        # Install
+        #   mono: NuGet requires a dotnet runtime
+        #   ninja: Build system
+        #   llvm: Just for clang-tidy. Need to add to path.
+        # Just add clang-tidy to path, not all of LLVM clang.
+        run: |
+          brew install mono ninja llvm
+          ln -s $(brew --prefix llvm)/bin/clang-tidy /usr/local/bin/clang-tidy
+          brew install autoconf autoconf-archive automake libtool
+
+      - name: Setup VCPKG
+        shell: bash
+        run: |
+          cd ${{ github.workspace }}
+          git clone https://github.com/microsoft/vcpkg
+          ${{ github.workspace }}/vcpkg/bootstrap-vcpkg.sh
+
+      - name: Add NuGet sources
+        shell: bash
+        env:
+          gh_packages_secret: ${{ secrets.GH_PACKAGES_TOKEN }}
+        if: ${{ env.gh_packages_secret != '' }}
+        run: |
+          mono `${{ env.VCPKG_EXE }} fetch nuget | tail -n 1` \
+            sources add \
+            -Source "${{ env.FEED_URL }}" \
+            -StorePasswordInClearText \
+            -Name GitHubPackages \
+            -UserName "${{ env.USERNAME }}" \
+            -Password "${{ secrets.GH_PACKAGES_TOKEN }}"
+          mono `${{ env.VCPKG_EXE }} fetch nuget | tail -n 1` \
+            setapikey "${{ secrets.GH_PACKAGES_TOKEN }}" \
+            -Source "${{ env.FEED_URL }}"
+
+      - name: CMake configure
+        shell: bash
+        run: cmake --preset clang
+
+      - name: CMake build
+        shell: bash
+        run: cmake --build --preset clang-release
+
+      - name: CTest
+        shell: bash
+        run: ctest --output-on-failure --test-dir build/clang/test/
