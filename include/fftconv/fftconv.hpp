@@ -545,7 +545,7 @@ void oaconvolve_fftw(std::span<const T> input, std::span<const T> kernel,
     assert(input.size() == output.size());
     plan.oaconvolve_same(input, kernel, output);
   } else {
-    static_assert(false, "Unsupported mode.");
+    static_assert(Mode == ConvMode::Full || Mode == ConvMode::Same, "Unsupported mode.");
   }
 }
 

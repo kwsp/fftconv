@@ -4,7 +4,7 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "pyfftconv"
-version = "0.5.0"
+version = "0.5.1"
 description = "A Python wrapper for FFT-based convolution and hilbert transform using FFTW"
 authors = [{ name = "Taylor Nie", email = "tnie@tuta.io" }]
 dependencies = ["numpy"]
