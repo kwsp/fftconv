@@ -15,7 +15,7 @@
 
 // NOLINTBEGIN(*-reinterpret-cast, *-const-cast)
 
-#define FFTCONV_VERSION "0.5.0"
+#define FFTCONV_VERSION "0.5.1"
 
 namespace fftconv {
 using fftw::Floating;

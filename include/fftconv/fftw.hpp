@@ -34,6 +34,7 @@ struct WisdomSetup {
     static bool callSetup = true;
     if (threadSafe && callSetup) {
       fftw_make_planner_thread_safe();
+      fftwf_make_planner_thread_safe();
       callSetup = false;
     }
     fftw_import_wisdom_from_filename(".fftw_wisdom");
