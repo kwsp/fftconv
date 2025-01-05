@@ -60,7 +60,7 @@ inline auto get_optimal_fft_size(const size_t filter_size) -> size_t {
 }
 
 // In memory cache with key type K and value type V
-template <class K, class V> auto get_cached(K key) {
+template <class K, class V> auto get_cached(K key) -> V * {
   static thread_local std::unordered_map<K, std::unique_ptr<V>> _cache;
 
   auto &val = _cache[key];
