@@ -3,7 +3,7 @@
 #include <fftconv/hilbert.hpp>
 #include <gtest/gtest.h>
 
-TEST(TestHilbertFFTW, Correct) {
+TEST(HilbertFFTW, Correct) {
   const auto fn = [&]<typename T>() {
     const std::array<T, 10> inp = {
         -0.999984, -0.736924, 0.511211, -0.0826997, 0.0655345,
@@ -16,7 +16,7 @@ TEST(TestHilbertFFTW, Correct) {
 
     fftconv::hilbert<T>(inp, out);
 
-    ExpectArraysNear<T>(expect.data(), out.data(), expect.size(), 1e-6);
+    ExpectVectorsNear<T>(out, expect, 1e-6);
   };
 
   fn.template operator()<double>();

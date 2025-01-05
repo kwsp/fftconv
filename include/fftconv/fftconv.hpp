@@ -317,7 +317,7 @@ template <typename T> struct FFTConvBuffer {
 
 // EngineFFTConv manages the memory of the forward and backward fft plans
 // and the fftw buffers
-template <typename T>
+template <typename T, int PlannerFlag = FFTW_ESTIMATE>
 struct FFTConvEngine : public fftw::cache_mixin<FFTConvEngine<T>> {
   using Plan = fftw::Plan<T>;
   using Cx = fftw::Complex<T>;
@@ -331,9 +331,9 @@ struct FFTConvEngine : public fftw::cache_mixin<FFTConvEngine<T>> {
   // n is padded_length
   explicit FFTConvEngine(size_t n)
       : buf(n), forward(Plan::dft_r2c_1d(n, buf.real_ptr(), buf.cx1_ptr(),
-                                         fftw::FLAGS)),
+                                         PlannerFlag)),
         backward(
-            Plan::dft_c2r_1d(n, buf.cx1_ptr(), buf.real_ptr(), fftw::FLAGS)) {}
+            Plan::dft_c2r_1d(n, buf.cx1_ptr(), buf.real_ptr(), PlannerFlag)) {}
 
   // Get the fftconv_plans object for a specific kernel size
   static auto get_for_ksize(size_t ksize) -> FFTConvEngine<T> & {
@@ -341,34 +341,44 @@ struct FFTConvEngine : public fftw::cache_mixin<FFTConvEngine<T>> {
     return FFTConvEngine<T>::get(fft_size);
   }
 
+  template <ConvMode Mode = ConvMode::Full>
   void convolve(View a, View k, MutableView out) {
     std::fill(out.begin(), out.end(), static_cast<T>(0));
 
     // Copy input to buffer
-    internal::copy_to_padded_buffer<T>(a, buf.real);
-
     // A = fft(a)
+    internal::copy_to_padded_buffer<T>(a, buf.real);
     forward.execute_dft_r2c(buf.real_ptr(), buf.cx1_ptr());
 
     // Copy b to buffer
-    internal::copy_to_padded_buffer<T>(k, buf.real);
-
     // B = fft(b)
+    internal::copy_to_padded_buffer<T>(k, buf.real);
     forward.execute_dft_r2c(buf.real_ptr(), buf.cx2_ptr());
 
     // Complex elementwise multiple, A = A * B
     internal::multiply_cx<T>(buf.cx1, buf.cx2, buf.cx1);
 
+    // a = ifft(A)
     const T fct = 1. / buf.real.size();
-    if (isSIMDAligned<64>(out.data())) {
-      // a = ifft(A)
-      backward.execute_dft_c2r(buf.cx1_ptr(), out.data());
-      fftw::normalize<T>(out, fct);
-    } else {
-      // a = ifft(A)
+    if constexpr (Mode == ConvMode::Full) {
+
+      if (isSIMDAligned<64>(out.data())) {
+        backward.execute_dft_c2r(buf.cx1_ptr(), out.data());
+        fftw::normalize<T>(out, fct);
+      } else {
+        backward.execute_dft_c2r(buf.cx1_ptr(), buf.real_ptr());
+        fftw::normalize<T>(buf.real, fct);
+        std::copy(buf.real.begin(), buf.real.end(), out.begin());
+      }
+
+    } else if constexpr (Mode == ConvMode::Same) {
+      const size_t padding = k.size() / 2;
+
       backward.execute_dft_c2r(buf.cx1_ptr(), buf.real_ptr());
       fftw::normalize<T>(buf.real, fct);
-      std::copy(buf.real.begin(), buf.real.end(), out.begin());
+
+      const auto *const real_ptr = buf.real_ptr() + padding;
+      std::copy(real_ptr, real_ptr + out.size(), out.data());
     }
   }
 
@@ -442,13 +452,14 @@ struct FFTConvEngine : public fftw::cache_mixin<FFTConvEngine<T>> {
 //    * Cache fftw_plan
 //    * Reuse buffers (no malloc on second call to the same convolution size)
 // https://en.wikipedia.org/w/index.php?title=Convolution#Fast_convolution_algorithms
-template <Floating T, ConvMode Mode = ConvMode::Same>
+template <Floating T, ConvMode Mode = ConvMode::Same,
+          int PlannerFlag = FFTW_ESTIMATE>
 void convolve_fftw(const std::span<const T> input,
                    const std::span<const T> kernel, std::span<T> output) {
   // length of the real arrays, including the final convolution output
   const size_t padded_length = input.size() + kernel.size() - 1;
-  auto &plan = FFTConvEngine<T>::get(padded_length);
-  plan.convolve(input, kernel, output);
+  auto &plan = FFTConvEngine<T, PlannerFlag>::get(padded_length);
+  plan.template convolve<Mode>(input, kernel, output);
 }
 
 /**
@@ -462,10 +473,11 @@ For "Same" mode, output_size == input_size
 2. convolve with kernel using fft of length N.
 3. add blocks together
  */
-template <Floating T, ConvMode Mode = ConvMode::Same>
+template <Floating T, ConvMode Mode = ConvMode::Same,
+          int PlannerFlag = FFTW_ESTIMATE>
 void oaconvolve_fftw(std::span<const T> input, std::span<const T> kernel,
                      std::span<T> output) {
-  auto &plan = FFTConvEngine<T>::get_for_ksize(kernel.size());
+  auto &plan = FFTConvEngine<T, PlannerFlag>::get_for_ksize(kernel.size());
   plan.template oaconvolve<Mode>(input, kernel, output);
 }
 

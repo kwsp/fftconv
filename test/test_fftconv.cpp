@@ -98,115 +98,131 @@ template <> struct Tol<double> {
   auto operator()() { return DoubleTol; }
 };
 
-TEST(FFTConvEngine, ExecutesOAConvFull) {
+TEST(FFTConvEngine, OAConvFull) {
   using T = double;
   arma::Col<T> kernel(95, arma::fill::randn);
 
   auto &plans = fftconv::FFTConvEngine<T>::get_for_ksize(kernel.size());
-
-  // for (const auto arr_size : {1000, 2000, 3000}) {
-  for (const auto arr_size : {1000}) {
+  for (const auto arr_size : {1000, 2000, 3000}) {
     arma::Col<T> arr(arr_size, arma::fill::randn);
     arma::Col<T> expected = arma::conv(arr, kernel);
     arma::Col<T> res(arr.size() + kernel.size() - 1, arma::fill::zeros);
 
-    plans.oaconvolve<ConvMode::Full>(
-        std::span<const T>(arr), std::span<const T>(kernel), std::span<T>(res));
-
-    expected.save(fmt::format("full_expected_{}.bin", arr_size),
-                  arma::raw_binary);
-    arr.save(fmt::format("full_arr_{}.bin", arr_size), arma::raw_binary);
-    kernel.save(fmt::format("full_kernel_{}.bin", arr_size), arma::raw_binary);
-    res.save(fmt::format("full_res_{}.bin", arr_size), arma::raw_binary);
+    plans.oaconvolve<ConvMode::Full>(arr, kernel, res);
 
     ExpectVectorsNear(std::span<const T>(res), std::span<const T>(expected),
                       Tol<T>()());
   }
 }
 
-TEST(FFTConvEngine, ExecutesOAConvSame) {
+TEST(FFTConvEngine, OAConvSame) {
   using T = double;
   arma::Col<T> kernel(95, arma::fill::randn);
 
   auto &plans = fftconv::FFTConvEngine<T>::get_for_ksize(kernel.size());
-
   for (const auto arr_size : {1000, 2000, 3000}) {
     arma::Col<T> arr(arr_size, arma::fill::randn);
     arma::Col<T> expected = arma::conv(arr, kernel, "same");
     arma::Col<T> res(arr.size(), arma::fill::zeros);
 
-    plans.oaconvolve<ConvMode::Same>(
-        std::span<const T>(arr), std::span<const T>(kernel), std::span<T>(res));
+    plans.oaconvolve<ConvMode::Same>(arr, kernel, res);
 
-    expected.save(fmt::format("same_expected_{}.bin", arr_size),
-                  arma::raw_binary);
-    arr.save(fmt::format("same_arr_{}.bin", arr_size), arma::raw_binary);
-    kernel.save(fmt::format("same_kernel_{}.bin", arr_size), arma::raw_binary);
-    res.save(fmt::format("same_res_{}.bin", arr_size), arma::raw_binary);
-
-    for (size_t i = 0; i < expected.size(); ++i) {
-      ASSERT_NEAR(expected[i], res[i], DoubleTol)
-          << "Vectors differ at index " << i;
-    }
+    ExpectVectorsNear<T>(res, expected, Tol<T>()());
   }
 }
 
 // Test convolution
-template <fftconv::Floating T, typename Func>
-void execute_conv_full_correctly(Func conv_func) {
+template <fftconv::Floating T, ConvMode Mode, typename Func>
+void test_conv(Func conv_func) {
   for (int real_size = 4; real_size < 100; real_size += 9) {
-    arma::Col<T> arr1(real_size, arma::fill::randn);
-    arma::Col<T> arr2(real_size, arma::fill::randn);
-    arma::Col<T> expected = arma::conv(arr1, arr2);
-    arma::Col<T> res(arr1.size() + arr2.size() - 1, arma::fill::zeros);
+    arma::Col<T> a(real_size, arma::fill::randn);
+    arma::Col<T> k(real_size, arma::fill::randn);
 
-    conv_func(std::span<const T>(arr1), std::span<const T>(arr2),
-              std::span<T>(res));
+    size_t outSize{};
+    arma::Col<T> expected;
+    if constexpr (Mode == ConvMode::Full) {
+      outSize = a.size() + k.size() - 1;
+      expected = arma::conv(a, k, "full");
+    } else if constexpr (Mode == ConvMode::Same) {
+      outSize = a.size();
+      expected = arma::conv(a, k, "same");
+    }
 
-    ExpectVectorsNear(std::span<const T>(res), std::span<const T>(expected),
-                      Tol<T>()());
+    arma::Col<T> out(outSize, arma::fill::zeros);
+    conv_func(a, k, out);
+
+    ExpectVectorsNear<T>(out, expected, Tol<T>()());
   }
-}
-
-TEST(ConvolveFFTW, ExecuteCorrectly) {
-  execute_conv_full_correctly<double>(fftconv::convolve_fftw<double>);
-
-  execute_conv_full_correctly<float>(fftconv::convolve_fftw<float>);
-}
-
-TEST(Convolution, ExecuteOAConvCorrectlyDifferentSizes) {
-  execute_conv_full_correctly<double>(
-      fftconv::oaconvolve_fftw<double, fftconv::Full>);
-
-  execute_conv_full_correctly<float>(
-      fftconv::oaconvolve_fftw<float, fftconv::Full>);
 }
 
 // Test convolution
-template <fftconv::Floating T, typename Func>
-void execute_oaconv_same_correctly(Func conv_func) {
-  const int ksize = 65;
+template <fftconv::Floating T, ConvMode Mode, typename Func>
+void test_oaconv(Func conv_func) {
+  const int ksize = 95;
   const arma::Col<T> kernel(ksize, arma::fill::randn);
+
   for (int real_size = 200; real_size < 501; real_size += 150) {
-    const arma::Col<T> arr(real_size, arma::fill::randn);
-    const arma::Col<T> expected = arma::conv(arr, kernel, "same");
+    const arma::Col<T> a(real_size, arma::fill::randn);
 
-    arma::Col<T> res(arr.size(), arma::fill::zeros);
+    size_t outSize{};
+    arma::Col<T> expected;
+    if constexpr (Mode == ConvMode::Full) {
+      outSize = a.size() + kernel.size() - 1;
+      expected = arma::conv(a, kernel, "full");
+    } else if constexpr (Mode == ConvMode::Same) {
+      outSize = a.size();
+      expected = arma::conv(a, kernel, "same");
+    }
 
-    conv_func(std::span<const T>(arr), std::span<const T>(kernel),
-              std::span<T>(res));
+    arma::Col<T> res(outSize, arma::fill::zeros);
+    conv_func(a, kernel, res);
 
     ExpectVectorsNear(std::span<const T>(res), std::span<const T>(expected),
                       Tol<T>()());
   }
 }
 
-TEST(OAConvolveSame, ExecuteCorrectly) {
-  execute_oaconv_same_correctly<double>(
-      fftconv::oaconvolve_fftw<double, fftconv::Same>);
+TEST(Convolve, Full) {
+  constexpr auto mode = ConvMode::Full;
+  test_conv<double, mode>(fftconv::convolve_fftw<double, mode>);
+  test_conv<float, mode>(fftconv::convolve_fftw<float, mode>);
+}
 
-  execute_oaconv_same_correctly<float>(
-      fftconv::oaconvolve_fftw<float, fftconv::Same>);
+TEST(Convolve, Same) {
+  constexpr auto mode = ConvMode::Same;
+  test_conv<double, mode>(fftconv::convolve_fftw<double, mode>);
+  test_conv<float, mode>(fftconv::convolve_fftw<float, mode>);
+}
+
+TEST(Convolve, PlannerFlag) {
+  constexpr auto mode = ConvMode::Full;
+  using T = double;
+  test_conv<T, mode>(fftconv::convolve_fftw<T, mode, FFTW_ESTIMATE>);
+  test_conv<T, mode>(fftconv::convolve_fftw<T, mode, FFTW_PATIENT>);
+  test_conv<T, mode>(fftconv::convolve_fftw<T, mode, FFTW_EXHAUSTIVE>);
+}
+
+TEST(OAConvolve, Full) {
+  constexpr auto mode = ConvMode::Full;
+  test_conv<double, mode>(fftconv::oaconvolve_fftw<double, mode>);
+  test_conv<float, mode>(fftconv::oaconvolve_fftw<float, mode>);
+}
+
+TEST(OAConvolve, Same) {
+  constexpr auto mode = ConvMode::Same;
+
+  test_oaconv<double, mode>(fftconv::oaconvolve_fftw<double, mode>);
+  test_oaconv<float, mode>(fftconv::oaconvolve_fftw<float, mode>);
+}
+
+TEST(OAConvolve, PlannerFlag) {
+  using T = double;
+  constexpr auto mode = ConvMode::Same;
+
+  test_oaconv<T, mode>(fftconv::oaconvolve_fftw<T, mode, FFTW_ESTIMATE>);
+  test_oaconv<T, mode>(fftconv::oaconvolve_fftw<T, mode, FFTW_MEASURE>);
+  test_oaconv<T, mode>(fftconv::oaconvolve_fftw<T, mode, FFTW_PATIENT>);
+  test_oaconv<T, mode>(fftconv::oaconvolve_fftw<T, mode, FFTW_EXHAUSTIVE>);
 }
 
 // NOLINTEND(*-magic-numbers,*-array-index)

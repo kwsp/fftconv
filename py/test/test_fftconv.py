@@ -6,9 +6,8 @@ from numpy.testing import assert_allclose
 from pyfftconv import convolve, convolve_, hilbert, hilbert_, oaconvolve, oaconvolve_
 
 
-class TestFFTConv(unittest.TestCase):
+class TestConvolve(unittest.TestCase):
     def setUp(self):
-        # Example test data
         self.a = np.array([1, 2, 3, 4, 5], dtype=np.float64)
         self.k = np.array([0.2, 0.5, 0.2], dtype=np.float64)
         self.out_full = np.empty(self.a.size + self.k.size - 1)
@@ -23,6 +22,16 @@ class TestFFTConv(unittest.TestCase):
         convolve_(self.a, self.k, self.out_full, mode="full")
         expected = np.convolve(self.a, self.k, mode="full")
         assert_allclose(self.out_full, expected, rtol=1e-5, atol=1e-8)
+
+    def test_convolve_same(self):
+        result = convolve(self.a, self.k, mode="same")
+        expected = np.convolve(self.a, self.k, mode="same")
+        assert_allclose(result, expected, rtol=1e-5, atol=1e-8)
+
+    def test_convolve_out_same(self):
+        convolve_(self.a, self.k, self.out_same, mode="same")
+        expected = np.convolve(self.a, self.k, mode="same")
+        assert_allclose(self.out_same, expected, rtol=1e-5, atol=1e-8)
 
     def test_oaconvolve_full(self):
         result = oaconvolve(self.a, self.k, mode="full")
@@ -44,15 +53,21 @@ class TestFFTConv(unittest.TestCase):
         expected = np.convolve(self.a, self.k, mode="same")
         assert_allclose(self.out_same, expected, rtol=1e-5, atol=1e-8)
 
+
+class TestHilbert(unittest.TestCase):
+    def setUp(self):
+        self.a = np.array([1, 2, 3, 4, 5], dtype=np.float64)
+        self.out = np.empty(self.a.size)
+
     def test_hilbert(self):
         result = hilbert(self.a)
         expected = np.abs(signal.hilbert(self.a))
         assert_allclose(result, expected, rtol=1e-5, atol=1e-8)
 
     def test_hilbert_out(self):
-        hilbert_(self.a, self.out_same)
+        hilbert_(self.a, self.out)
         expected = np.abs(signal.hilbert(self.a))
-        assert_allclose(self.out_same, expected, rtol=1e-5, atol=1e-8)
+        assert_allclose(self.out, expected, rtol=1e-5, atol=1e-8)
 
 
 if __name__ == "__main__":

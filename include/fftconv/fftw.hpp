@@ -23,9 +23,6 @@ A C++ FFTW wrapper
 
 namespace fftw {
 
-// const static unsigned int FLAGS = FFTW_ESTIMATE;
-const static unsigned int FLAGS = FFTW_EXHAUSTIVE;
-
 // Place this at the beginning of main() and RAII will take care of setting up
 // and tearing down FFTW3 (threads and wisdom)
 // NOLINTNEXTLINE(*-special-member-functions)
@@ -561,19 +558,20 @@ template <typename T> struct R2CSplitBuffer {
   }
 };
 
-template <Floating T, bool InPlace = false>
+template <Floating T, int PlannerFlag = FFTW_ESTIMATE, bool InPlace = false>
 struct EngineDFT1D : public cache_mixin<EngineDFT1D<T>> {
   using Cx = fftw::Complex<T>;
   using Plan = fftw::Plan<T>;
 
-  C2CBuffer<T> buf;
+  C2CBuffer<T, InPlace> buf;
   Plan plan_forward;
   Plan plan_backward;
 
   explicit EngineDFT1D(size_t n)
-      : buf(n),
-        plan_forward(Plan::dft_1d(n, buf.in, buf.out, FFTW_FORWARD, FLAGS)),
-        plan_backward(Plan::dft_1d(n, buf.out, buf.in, FFTW_BACKWARD, FLAGS)){};
+      : buf(n), plan_forward(Plan::dft_1d(n, buf.in, buf.out, FFTW_FORWARD,
+                                          PlannerFlag)),
+        plan_backward(
+            Plan::dft_1d(n, buf.out, buf.in, FFTW_BACKWARD, PlannerFlag)){};
 
   void forward() { plan_forward.execute(); }
   void forward(const Cx *in, Cx *out) const { plan_forward.execute(in, out); }
@@ -581,7 +579,8 @@ struct EngineDFT1D : public cache_mixin<EngineDFT1D<T>> {
   void backward(const Cx *in, Cx *out) const { plan_backward.execute(in, out); }
 };
 
-template <Floating T> struct EngineR2C1D : public cache_mixin<EngineR2C1D<T>> {
+template <Floating T, int PlannerFlag = FFTW_ESTIMATE>
+struct EngineR2C1D : public cache_mixin<EngineR2C1D<T>> {
   using Cx = fftw::Complex<T>;
   using Plan = fftw::Plan<T>;
 
@@ -591,9 +590,9 @@ template <Floating T> struct EngineR2C1D : public cache_mixin<EngineR2C1D<T>> {
 
   explicit EngineR2C1D(size_t n)
       : buf(n), plan_forward(Plan::dft_r2c_1d(static_cast<int>(n), buf.in,
-                                              buf.out, FLAGS)),
-        plan_backward(
-            Plan::dft_c2r_1d(static_cast<int>(n), buf.out, buf.in, FLAGS)) {}
+                                              buf.out, PlannerFlag)),
+        plan_backward(Plan::dft_c2r_1d(static_cast<int>(n), buf.out, buf.in,
+                                       PlannerFlag)) {}
 
   void forward() { plan_forward.execute(); }
   void forward(const T *in, Cx *out) const {

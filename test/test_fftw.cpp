@@ -6,13 +6,6 @@
 // NOLINTBEGIN(*-magic-numbers, *-pointer-arithmetic, *-non-private-member-*,
 // *-member-function, *-destructor)
 
-template <typename T>
-void ExpectArraysNear(std::span<const T> arr1, std::span<const T> arr2,
-                      T tolerance) {
-  assert(arr1.size() == arr2.size());
-  return ExpectArraysNear<T>(arr1.data(), arr2.data(), arr1.size(), tolerance);
-}
-
 class FFTWPlanCreateC2C : public testing::Test {
 protected:
   using T = double;
@@ -301,8 +294,8 @@ TEST_F(FFTWPlanCreateC2CSplit, GuruPlanSplitCorrect) {
   ASSERT_NE(pf.plan, nullptr);
   pf.execute();
 
-  ExpectArraysNear<T>(ro, expect_ro, 1e-7);
-  ExpectArraysNear<T>(io, expect_io, 1e-7);
+  ExpectVectorsNear<T>(ro, expect_ro, 1e-7);
+  ExpectVectorsNear<T>(io, expect_io, 1e-7);
 }
 
 TEST_F(FFTWPlanCreateR2C, GuruPlan) {
@@ -383,8 +376,8 @@ TEST_F(FFTWPlanCreateR2CSplit, GuruPlanSplitCorrect) {
   ASSERT_NE(pf.plan, nullptr);
   pf.execute();
 
-  ExpectArraysNear<T>(expect_ro, ro, 1e-7);
-  ExpectArraysNear<T>(expect_io, io, 1e-7);
+  ExpectVectorsNear<T>(ro, expect_ro, 1e-7);
+  ExpectVectorsNear<T>(io, expect_io, 1e-7);
 
   auto pb = fftw::Plan<T>::guru_split_dft_c2r(rank, &dim, howmany, &howmany_dim,
                                               ro.data(), io.data(), in_.data(),
@@ -396,7 +389,7 @@ TEST_F(FFTWPlanCreateR2CSplit, GuruPlanSplitCorrect) {
   for (double &v : in_) {
     v *= fct;
   }
-  ExpectArraysNear<T>(in, in_, 1e-7);
+  ExpectVectorsNear<T>(in, in_, 1e-7);
 }
 
 // NOLINTEND(*-magic-numbers, *-pointer-arithmetic, *-non-private-member-*,
