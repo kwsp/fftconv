@@ -6,19 +6,21 @@
 #include <array>
 #include <cassert>
 #include <complex>
+#include <fftconv/aligned_vector.hpp>
 #include <fftconv/fftw.hpp>
 #include <memory>
 #include <span>
 #include <type_traits>
 #include <unordered_map>
 
-// NOLINTBEGIN(*-reinterpret-cast, *-const-cast)
+// NOLINTBEGIN(*-reinterpret-cast, *-const-cast, *-pointer-arithmetic)
 
 #define FFTCONV_VERSION "0.5.1"
 
 namespace fftconv {
 using fftw::Floating;
 using fftw::Plan;
+enum ConvMode { Full, Same };
 
 // Function to check if a pointer is SIMD-aligned
 template <std::size_t Alignment> bool isSIMDAligned(const void *ptr) {
@@ -69,39 +71,11 @@ template <class K, class V> auto get_cached(K key) {
   return val.get();
 }
 
-// // In memory cache with key type K and value type V
-// // additionally accepts a mutex to guard the V constructor
-// template <class Key, class Val>
-// auto get_cached_vlock(Key key, std::mutex *V_mutex) {
-//   static thread_local std::unordered_map<Key, std::unique_ptr<Val>> _cache;
-
-//   auto &val = _cache[key];
-//   if (val == nullptr) {
-//     // Using unique_lock here for RAII locking since the mutex is optional.
-//     // If we have a non-optional mutex, prefer scoped_lock
-//     const auto lock = V_mutex == nullptr ? std::unique_lock<std::mutex>{}
-//                                          : std::unique_lock(*V_mutex);
-
-//     val = std::make_unique<Val>(key);
-//   }
-
-//   return val.get();
-// }
-
 // Copy data from src to dst and padded the extra with zero
 // dst_size must be greater than src_size
-// Deprecated
-template <typename Real>
-inline void copy_to_padded_buffer(const Real *src, const size_t src_size,
-                                  Real *dst, const size_t dst_size) {
-  assert(src_size <= dst_size);
-  std::copy(src, src + src_size, dst);
-  std::fill(dst + src_size, dst + dst_size, 0);
-}
-
-template <typename Tin, typename Tout = Tin>
-inline void copy_to_padded_buffer(const std::span<const Tin> src,
-                                  const std::span<Tout> dst) {
+template <typename T>
+inline void copy_to_padded_buffer(const std::span<const T> src,
+                                  const std::span<T> dst) {
   // Assert that destination span is larger or equal to the source span
   assert(src.size() <= dst.size());
 
@@ -109,43 +83,8 @@ inline void copy_to_padded_buffer(const std::span<const Tin> src,
   std::copy(src.begin(), src.end(), dst.begin());
 
   // Fill the remaining part of the destination with zeros
-  auto dst_ = dst.subspan(src.size());
+  const auto dst_ = dst.subspan(src.size());
   std::fill(dst_.begin(), dst_.end(), 0);
-}
-
-// static inline void elementwise_multiply(const fftw_complex *a,
-// const fftw_complex *b,
-// const size_t length,
-// fftw_complex *result) {
-//// fftw_complex in C89 mode is double[2], which is binary compatible with
-//// C99's <complex.h> and C++'s complex<double> template class
-//// http://www.fftw.org/doc/Complex-numbers.html
-// const auto _a = reinterpret_cast<const std::complex<double> *>(a);
-// const auto _b = reinterpret_cast<const std::complex<double> *>(b);
-// auto _res = reinterpret_cast<std::complex<double> *>(result);
-
-// for (size_t i = 0; i < length; ++i)
-//_res[i] = _a[i] * _b[i];
-//}
-
-template <Floating T>
-inline void
-elementwise_multiply_fftw_cx(std::span<const fftw::Complex<T>> complex1,
-                             std::span<const fftw::Complex<T>> complex2,
-                             std::span<fftw::Complex<T>> result) {
-  // implement naive complex multiply. This is much faster than the
-  // std version, but doesn't handle infinities.
-  // https://stackoverflow.com/questions/49438158/why-is-muldc3-called-when-two-stdcomplex-are-multiplied
-
-  const auto size = std::min(complex1.size(), complex2.size());
-  for (size_t i = 0; i < size; ++i) {
-    const auto a_1 = complex1[i][0];
-    const auto a_2 = complex1[i][1];
-    const auto b_1 = complex2[i][0];
-    const auto b_2 = complex2[i][1];
-    result[i][0] = a_1 * b_1 - a_2 * b_2;
-    result[i][1] = a_2 * b_1 + a_1 * b_2;
-  }
 }
 
 #if defined(__ARM_NEON__)
@@ -353,27 +292,27 @@ inline void multiply_cx(std::span<const fftw::Complex<T>> cx1,
 } // namespace internal
 
 template <typename T> struct FFTConvBuffer {
-  using Cx = fftw::Complex<T>;
+  // using Cx = fftw::Complex<T>;
+  using Cx = std::complex<T>;
 
-  std::span<T> real;
-  std::span<Cx> cx1;
-  std::span<Cx> cx2;
-
-  FFTConvBuffer(const FFTConvBuffer &) = delete;
-  FFTConvBuffer(FFTConvBuffer &&) = delete;
-  FFTConvBuffer &operator=(const FFTConvBuffer &) = delete;
-  FFTConvBuffer &operator=(FFTConvBuffer &&) = delete;
+  AlignedVector<T> real;
+  AlignedVector<Cx> cx1;
+  AlignedVector<Cx> cx2;
 
   explicit FFTConvBuffer(size_t real_sz)
-      : real(fftw::alloc_real<T>(real_sz), real_sz),
-        cx1(fftw::alloc_complex<T>(real_sz / 2 + 1), real_sz / 2 + 1),
-        cx2(fftw::alloc_complex<T>(real_sz / 2 + 1), real_sz / 2 + 1) {}
+      : real(real_sz), cx1(real_sz / 2 + 1), cx2(real_sz / 2 + 1) {}
 
-  ~FFTConvBuffer() {
-    fftw::free<T>(real.data());
-    fftw::free<T>(cx1.data());
-    fftw::free<T>(cx2.data());
+  auto real_ptr() -> T * { return real.data(); }
+  auto cx1_ptr() -> fftw::Complex<T> * {
+    return reinterpret_cast<fftw::Complex<T> *>(cx1.data());
   }
+  auto cx2_ptr() -> fftw::Complex<T> * {
+    return reinterpret_cast<fftw::Complex<T> *>(cx2.data());
+  }
+
+  auto real_span() -> std::span<T> { return real; }
+  auto cx1_span() -> std::span<Cx> { return cx1; }
+  auto cx2_span() -> std::span<Cx> { return cx2; }
 };
 
 // EngineFFTConv manages the memory of the forward and backward fft plans
@@ -382,6 +321,8 @@ template <typename T>
 struct FFTConvEngine : public fftw::cache_mixin<FFTConvEngine<T>> {
   using Plan = fftw::Plan<T>;
   using Cx = fftw::Complex<T>;
+  using View = const std::span<const T>;
+  using MutableView = std::span<T>;
 
   FFTConvBuffer<T> buf;
   Plan forward;
@@ -389,10 +330,10 @@ struct FFTConvEngine : public fftw::cache_mixin<FFTConvEngine<T>> {
 
   // n is padded_length
   explicit FFTConvEngine(size_t n)
-      : buf(n), forward(Plan::dft_r2c_1d(n, buf.real.data(), buf.cx1.data(),
+      : buf(n), forward(Plan::dft_r2c_1d(n, buf.real_ptr(), buf.cx1_ptr(),
                                          fftw::FLAGS)),
-        backward(Plan::dft_c2r_1d(n, buf.cx1.data(), buf.real.data(),
-                                  fftw::FLAGS)) {}
+        backward(
+            Plan::dft_c2r_1d(n, buf.cx1_ptr(), buf.real_ptr(), fftw::FLAGS)) {}
 
   // Get the fftconv_plans object for a specific kernel size
   static auto get_for_ksize(size_t ksize) -> FFTConvEngine<T> & {
@@ -400,103 +341,98 @@ struct FFTConvEngine : public fftw::cache_mixin<FFTConvEngine<T>> {
     return FFTConvEngine<T>::get(fft_size);
   }
 
-  void convolve(const std::span<const T> input, const std::span<const T> kernel,
-                const std::span<T> output) {
-    std::fill(output.begin(), output.end(), static_cast<T>(0));
+  void convolve(View a, View k, MutableView out) {
+    std::fill(out.begin(), out.end(), static_cast<T>(0));
 
     // Copy input to buffer
-    internal::copy_to_padded_buffer<T>(input, buf.real);
+    internal::copy_to_padded_buffer<T>(a, buf.real);
 
     // A = fft(a)
-    forward.execute_dft_r2c(buf.real.data(), buf.cx1.data());
+    forward.execute_dft_r2c(buf.real_ptr(), buf.cx1_ptr());
 
     // Copy b to buffer
-    internal::copy_to_padded_buffer<T>(kernel, buf.real);
+    internal::copy_to_padded_buffer<T>(k, buf.real);
 
     // B = fft(b)
-    forward.execute_dft_r2c(buf.real.data(), buf.cx2.data());
+    forward.execute_dft_r2c(buf.real_ptr(), buf.cx2_ptr());
 
     // Complex elementwise multiple, A = A * B
     internal::multiply_cx<T>(buf.cx1, buf.cx2, buf.cx1);
 
-    // a = ifft(A)
-    backward.execute_dft_c2r(buf.cx1.data(), buf.real.data());
-
-    // divide each result elem by real_sz
-    fftw::normalize<T>(buf.real.data(), buf.real.size(), 1. / buf.real.size());
-
-    std::copy(buf.real.begin(), buf.real.end(), output.begin());
-  }
-
-  void oaconvolve_full(const std::span<const T> input,
-                       const std::span<const T> kernel, std::span<T> output) {
-    assert(buf.real.size() == internal::get_optimal_fft_size(kernel.size()));
-    std::fill(output.begin(), output.end(), 0);
-
-    const auto &real = buf.real;
-    const auto &cx1 = buf.cx1;
-    const auto &cx2 = buf.cx2;
-
-    const auto fft_size = real.size();
-    const auto step_size = fft_size - (kernel.size() - 1);
-
-    // forward fft of kernel and save to complex2
-    internal::copy_to_padded_buffer<T>(kernel, buf.real);
-    forward.execute_dft_r2c(real.data(), buf.cx2.data());
-
-    // create forward/backward ffts for x
-    // Normalization factor
-    const auto fct = static_cast<T>(1. / fft_size);
-    for (size_t pos = 0; pos < input.size(); pos += step_size) {
-      size_t len =
-          std::min<size_t>(input.size() - pos, step_size); // bound check
-      internal::copy_to_padded_buffer<T>(input.subspan(pos, len), buf.real);
-      forward.execute_dft_r2c(real.data(), buf.cx1.data());
-      internal::multiply_cx<T>(cx1, buf.cx2, buf.cx1);
-      backward.execute_dft_c2r(cx1.data(), buf.real.data());
-
-      // normalize output and add to result
-      fftw::normalize_add<T>(output.subspan(pos), real, fct);
+    const T fct = 1. / buf.real.size();
+    if (isSIMDAligned<64>(out.data())) {
+      // a = ifft(A)
+      backward.execute_dft_c2r(buf.cx1_ptr(), out.data());
+      fftw::normalize<T>(out, fct);
+    } else {
+      // a = ifft(A)
+      backward.execute_dft_c2r(buf.cx1_ptr(), buf.real_ptr());
+      fftw::normalize<T>(buf.real, fct);
+      std::copy(buf.real.begin(), buf.real.end(), out.begin());
     }
   }
 
-  void oaconvolve_same(const std::span<const T> input,
-                       const std::span<const T> kernel, std::span<T> output) {
-    assert(buf.real.size() == internal::get_optimal_fft_size(kernel.size()));
-    std::fill(output.begin(), output.end(), 0);
+  template <ConvMode Mode = ConvMode::Full>
+  void oaconvolve(View a, View k, MutableView out) {
+    assert(buf.real.size() == internal::get_optimal_fft_size(k.size()));
+    std::fill(out.begin(), out.end(), 0);
 
-    const auto &real = buf.real;
-    const auto &cx1 = buf.cx1;
-    const auto &cx2 = buf.cx2;
-
-    const auto fft_size = real.size();
-    const auto step_size = fft_size - (kernel.size() - 1);
+    const size_t fft_size = buf.real.size();
+    const size_t step_size = fft_size - (k.size() - 1);
 
     // forward fft of kernel and save to complex2
-    internal::copy_to_padded_buffer<T>(kernel, real);
-    forward.execute_dft_r2c(real.data(), cx2.data());
+    internal::copy_to_padded_buffer<T>(k, buf.real);
+    forward.execute_dft_r2c(buf.real_ptr(), buf.cx2_ptr());
 
-    const size_t padding = kernel.size() / 2;
-
-    // create forward/backward ffts for x
-    // Normalization factor
     const auto fct = static_cast<T>(1. / fft_size);
-    for (size_t pos = 0; pos < input.size(); pos += step_size) {
-      size_t len =
-          std::min<size_t>(input.size() - pos, step_size); // bound check
 
-      internal::copy_to_padded_buffer<T>(input.subspan(pos, len), real);
-      forward.execute_dft_r2c(real.data(), cx1.data());
-      internal::multiply_cx<T>(cx1, cx2, cx1);
-      backward.execute_dft_c2r(cx1.data(), real.data());
+    if constexpr (Mode == ConvMode::Full) {
+      assert(a.size() + k.size() - 1 == out.size());
 
-      // normalize output and add to result
-      if (pos < padding) {
-        fftw::normalize_add<T>(output, real.subspan(padding), fct);
-      } else {
-        fftw::normalize_add<T>(output.subspan(pos - padding), real, fct);
+      // create forward/backward ffts for x
+      for (size_t pos = 0; pos < a.size(); pos += step_size) {
+        size_t len = std::min<size_t>(a.size() - pos, step_size); // bound check
+
+        internal::copy_to_padded_buffer<T>(a.subspan(pos, len), buf.real);
+        forward.execute_dft_r2c(buf.real_ptr(), buf.cx1_ptr());
+        internal::multiply_cx<T>(buf.cx1, buf.cx2, buf.cx1);
+        backward.execute_dft_c2r(buf.cx1_ptr(), buf.real_ptr());
+
+        // normalize output and add to result
+        fftw::normalize_add<T>(out.subspan(pos), buf.real, fct);
       }
+
+    } else if constexpr (Mode == ConvMode::Same) {
+      assert(a.size() == out.size());
+
+      const size_t padding = k.size() / 2;
+
+      for (size_t pos = 0; pos < a.size(); pos += step_size) {
+        size_t len = std::min<size_t>(a.size() - pos, step_size); // bound check
+
+        internal::copy_to_padded_buffer<T>(a.subspan(pos, len), buf.real);
+        forward.execute_dft_r2c(buf.real_ptr(), buf.cx1_ptr());
+        internal::multiply_cx<T>(buf.cx1, buf.cx2, buf.cx1);
+        backward.execute_dft_c2r(buf.cx1_ptr(), buf.real_ptr());
+
+        // normalize output and add to result
+        if (pos < padding) {
+          fftw::normalize_add<T>(out, buf.real_span().subspan(padding), fct);
+        } else {
+          fftw::normalize_add<T>(out.subspan(pos - padding), buf.real, fct);
+        }
+      }
+    } else {
+      static_assert(Mode == ConvMode::Full || Mode == ConvMode::Same,
+                    "Unsupported mode.");
     }
+  }
+
+  void oaconvolve_same(View a, View k, MutableView out) {
+    oaconvolve<ConvMode::Same>(a, k, out);
+  }
+  void oaconvolve_full(View a, View k, MutableView out) {
+    oaconvolve<ConvMode::Full>(a, k, out);
   }
 };
 
@@ -506,19 +442,14 @@ struct FFTConvEngine : public fftw::cache_mixin<FFTConvEngine<T>> {
 //    * Cache fftw_plan
 //    * Reuse buffers (no malloc on second call to the same convolution size)
 // https://en.wikipedia.org/w/index.php?title=Convolution#Fast_convolution_algorithms
-template <Floating T>
+template <Floating T, ConvMode Mode = ConvMode::Same>
 void convolve_fftw(const std::span<const T> input,
                    const std::span<const T> kernel, std::span<T> output) {
   // length of the real arrays, including the final convolution output
   const size_t padded_length = input.size() + kernel.size() - 1;
-
   auto &plan = FFTConvEngine<T>::get(padded_length);
-
-  // Execute FFT convolution and copy normalized result
   plan.convolve(input, kernel, output);
 }
-
-enum ConvMode { Full, Same };
 
 /**
 1D Overlap-Add convolution
@@ -534,97 +465,10 @@ For "Same" mode, output_size == input_size
 template <Floating T, ConvMode Mode = ConvMode::Same>
 void oaconvolve_fftw(std::span<const T> input, std::span<const T> kernel,
                      std::span<T> output) {
-  // Get cached plans
   auto &plan = FFTConvEngine<T>::get_for_ksize(kernel.size());
-
-  // Execute FFT convolution and copy normalized result
-  if constexpr (Mode == ConvMode::Full) {
-    assert(input.size() + kernel.size() - 1 == output.size());
-    plan.oaconvolve_full(input, kernel, output);
-  } else if constexpr (Mode == ConvMode::Same) {
-    assert(input.size() == output.size());
-    plan.oaconvolve_same(input, kernel, output);
-  } else {
-    static_assert(Mode == ConvMode::Full || Mode == ConvMode::Same,
-                  "Unsupported mode.");
-  }
-}
-
-// Reference implementation of fft convolution with minimal optimizations
-// Only supports double
-template <Floating T>
-void convolve_fftw_ref(const std::span<const double> input,
-                       const std::span<const double> kernel,
-                       std::span<double> output)
-  requires(std::is_same_v<T, double>)
-{
-  std::fill(output.begin(), output.end(), static_cast<T>(0));
-
-  // length of the real arrays, including the final convolution output
-  const size_t padded_length = input.size() + kernel.size() - 1;
-  // length of the complex arrays
-  const auto complex_length = padded_length / 2 + 1;
-
-  // Allocate fftw buffers for a
-  double *a_buf = fftw_alloc_real(padded_length);
-  fftw_complex *A_buf = fftw_alloc_complex(complex_length);
-
-  // Compute forward fft plan
-  fftw_plan plan_forward = fftw_plan_dft_r2c_1d(static_cast<int>(padded_length),
-                                                a_buf, A_buf, FFTW_ESTIMATE);
-
-  // Copy a to buffer
-  internal::copy_to_padded_buffer(input,
-                                  std::span<double>(a_buf, padded_length));
-
-  // Compute Fourier transform of vector a
-  fftw_execute_dft_r2c(plan_forward, a_buf, A_buf);
-
-  // Allocate fftw buffers for b
-  double *b_buf = fftw_alloc_real(padded_length);
-  fftw_complex *B_buf = fftw_alloc_complex(complex_length);
-
-  // Copy b to buffer
-  internal::copy_to_padded_buffer(kernel,
-                                  std::span<double>(b_buf, padded_length));
-
-  // Compute Fourier transform of vector b
-  fftw_execute_dft_r2c(plan_forward, b_buf, B_buf);
-
-  // Compute backward fft plan
-  fftw_complex *input_buffer = fftw_alloc_complex(complex_length);
-  double *output_buffer = fftw_alloc_real(padded_length);
-  fftw_plan plan_backward =
-      fftw_plan_dft_c2r_1d(static_cast<int>(padded_length), input_buffer,
-                           output_buffer, FFTW_ESTIMATE);
-
-  // Perform element-wise product of FFT(a) and FFT(b)
-  // then compute inverse fourier transform.
-  internal::elementwise_multiply_fftw_cx<T>(
-      std::span<fftw_complex const>(A_buf, complex_length),
-      std::span<fftw_complex const>(B_buf, complex_length),
-      std::span(input_buffer, complex_length));
-
-  // A_buf becomes input to inverse conv
-  fftw_execute_dft_c2r(plan_backward, input_buffer, output_buffer);
-
-  // Normalize output
-  for (int i = 0; i < std::min<size_t>(padded_length, output.size()); i++) {
-    // NOLINTBEGIN(*-pointer-arithmetic)
-    output[i] = output_buffer[i] / static_cast<double>(padded_length);
-    // NOLINTEND(*-pointer-arithmetic)
-  }
-
-  fftw_free(a_buf);
-  fftw_free(b_buf);
-  fftw_free(A_buf);
-  fftw_free(B_buf);
-  fftw_free(input_buffer);
-  fftw_free(output_buffer);
-  fftw_destroy_plan(plan_forward);
-  fftw_destroy_plan(plan_backward);
+  plan.template oaconvolve<Mode>(input, kernel, output);
 }
 
 } // namespace fftconv
 
-// NOLINTEND(*-reinterpret-cast, *-const-cast)
+// NOLINTEND(*-reinterpret-cast, *-const-cast, *-pointer-arithmetic)

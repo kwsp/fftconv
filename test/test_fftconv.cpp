@@ -12,6 +12,8 @@
 
 #include "test_common.hpp"
 
+using fftconv::ConvMode;
+
 // Test internal utils
 // Assuming the function is defined here or included from another header
 TEST(CopyToPaddedBuffer, SameTypeLargerDestination) {
@@ -26,20 +28,6 @@ TEST(CopyToPaddedBuffer, SameTypeLargerDestination) {
   EXPECT_EQ(dst[2], 3);
   EXPECT_EQ(dst[3], 0); // Check padding
   EXPECT_EQ(dst[4], 0); // Check padding
-}
-
-TEST(CopyToPaddedBuffer, DifferentTypeConversion) {
-  const std::vector<int> src = {1, 2, 3};
-  // Initialize with a non-zero value to test padding
-  std::vector<float> dst(5, -1.0F);
-
-  fftconv::internal::copy_to_padded_buffer(std::span(src), std::span(dst));
-
-  EXPECT_FLOAT_EQ(dst[0], 1.0F);
-  EXPECT_FLOAT_EQ(dst[1], 2.0F);
-  EXPECT_FLOAT_EQ(dst[2], 3.0F);
-  EXPECT_FLOAT_EQ(dst[3], 0.0F); // Check padding
-  EXPECT_FLOAT_EQ(dst[4], 0.0F); // Check padding
 }
 
 TEST(CopyToPaddedBuffer, SameSizeNoPaddingNeeded) {
@@ -122,8 +110,8 @@ TEST(FFTConvEngine, ExecutesOAConvFull) {
     arma::Col<T> expected = arma::conv(arr, kernel);
     arma::Col<T> res(arr.size() + kernel.size() - 1, arma::fill::zeros);
 
-    plans.oaconvolve_full(std::span<const T>(arr), std::span<const T>(kernel),
-                          std::span<T>(res));
+    plans.oaconvolve<ConvMode::Full>(
+        std::span<const T>(arr), std::span<const T>(kernel), std::span<T>(res));
 
     expected.save(fmt::format("full_expected_{}.bin", arr_size),
                   arma::raw_binary);
@@ -147,8 +135,8 @@ TEST(FFTConvEngine, ExecutesOAConvSame) {
     arma::Col<T> expected = arma::conv(arr, kernel, "same");
     arma::Col<T> res(arr.size(), arma::fill::zeros);
 
-    plans.oaconvolve_same(std::span<const T>(arr), std::span<const T>(kernel),
-                          std::span<T>(res));
+    plans.oaconvolve<ConvMode::Same>(
+        std::span<const T>(arr), std::span<const T>(kernel), std::span<T>(res));
 
     expected.save(fmt::format("same_expected_{}.bin", arr_size),
                   arma::raw_binary);

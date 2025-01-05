@@ -16,13 +16,6 @@ template <fftconv::Floating T>
 void bench(const arma::Col<T> &input, const arma::Col<T> &kernel) {
   arma::Col<T> output(input.size() + kernel.size() - 1);
 
-  if constexpr (std::is_same_v<T, double>) {
-    timeit(
-        "convolve_fftw_ref",
-        [&]() { fftconv::convolve_fftw_ref<double>(input, kernel, output); },
-        N_RUNS);
-  }
-
   timeit(
       "convolve_fftw",
       [&]() { fftconv::convolve_fftw<T>(input, kernel, output); }, N_RUNS);

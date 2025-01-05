@@ -5,6 +5,8 @@
 
 // NOLINTBEGIN(*-magic-numbers)
 
+using fftconv::AlignedVector;
+
 template <typename T, typename Func>
 void hilbert_bench(benchmark::State &state, Func hilbert_func) {
 
@@ -24,12 +26,12 @@ void hilbert_bench(benchmark::State &state, Func hilbert_func) {
   state.SetBytesProcessed(state.iterations() * state.range(0) * sizeof(T));
 }
 
-template <typename T> void BM_hilbert_fftw(benchmark::State &state) {
+template <typename T> void BM_hilbert(benchmark::State &state) {
   hilbert_bench<T>(state, fftconv::hilbert<T>);
 }
 
-BENCHMARK(BM_hilbert_fftw<float>)->DenseRange(2048, 6144, 1024);
-BENCHMARK(BM_hilbert_fftw<double>)->DenseRange(2048, 6144, 1024);
+BENCHMARK(BM_hilbert<float>)->DenseRange(2048, 6144, 1024);
+BENCHMARK(BM_hilbert<double>)->DenseRange(2048, 6144, 1024);
 
 #if defined(HAS_IPP)
 

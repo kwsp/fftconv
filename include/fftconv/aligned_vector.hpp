@@ -5,9 +5,12 @@ Aligned allocator and vector from https://stackoverflow.com/a/70994249/12734467
 
 #include <limits>
 #include <new>
+#include <vector>
 
 // NOLINTBEGIN(*-reinterpret-cast, *magic-numbers, *-special-member-functions,
 // *-redundant-access-specifiers)
+
+namespace fftconv {
 
 /**
  * Returns aligned pointers when allocations are requested. Default alignment
@@ -67,10 +70,10 @@ public:
   }
 };
 
-#include <vector>
-
 template <typename T, std::size_t ALIGNMENT_IN_BYTES = 64>
 using AlignedVector = std::vector<T, AlignedAllocator<T, ALIGNMENT_IN_BYTES>>;
+
+} // namespace fftconv
 
 // NOLINTEND(*-reinterpret-cast, *magic-numbers, *-special-member-functions,
 // *-redundant-access-specifiers)
