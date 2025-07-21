@@ -5,13 +5,13 @@ Extremely fast CPU 1D convolutions. [Faster than Intel IPP and Apple Accelerate 
 _Kernel size = 245_
 
 <p align="center">
-  <img src="https://github.com/kwsp/microbenchmarks/blob/main/src/conv1d/plots/Conv1d%20Throughput%20Bar%20(k%3D245)%2013th%20Gen%20Intel(R)%20Core(TM)%20i9-13900K.svg" width="45%">
-  <img src="https://github.com/kwsp/microbenchmarks/blob/main/src/conv1d/plots/Conv1d%20Throughput%20Line%20(k%3D245)%2013th%20Gen%20Intel(R)%20Core(TM)%20i9-13900K.svg" width="45%">
+  <img src="https://github.com/kwsp/microbenchmarks/blob/main/src/conv1d/plots/conv1d-bar-k=165-13th_gen_intelr_coretm_i9-13900k.svg" width="45%">
+  <img src="https://github.com/kwsp/microbenchmarks/blob/main/src/conv1d/plots/conv1d-line-k=165-13th_gen_intelr_coretm_i9-13900k.svg" width="45%">
 </p>
 
 <p align="center">
-  <img src="https://github.com/kwsp/microbenchmarks/blob/main/src/conv1d/plots/Conv1d%20Throughput%20Bar%20(k%3D245)%20Apple%20M1.svg" width="45%">
-  <img src="https://github.com/kwsp/microbenchmarks/blob/main/src/conv1d/plots/Conv1d%20Throughput%20Line%20(k%3D245)%20Apple%20M1.svg" width="45%">
+  <img src="https://github.com/kwsp/microbenchmarks/blob/main/src/conv1d/plots/conv1d-bar-k=165-apple_m1.svg" width="45%">
+  <img src="https://github.com/kwsp/microbenchmarks/blob/main/src/conv1d/plots/conv1d-line-k=165-apple_m1.svg" width="45%">
 </p>
 
 It's well know that convolution in the time domain is equivalent to multiplication in the frequency domain (circular convolution). With the Fast Fourier Transform, we can reduce the time complexity of a discrete convolution from `O(n^2)` to `O(n log(n))`, where `n` is the larger of the two array sizes. The **[overlap-add method](https://en.wikipedia.org/wiki/Overlap%E2%80%93add_method)** is a fast convolution method commonly use in FIR filtering, where the discrete signal is often much longer than the FIR filter kernel.
