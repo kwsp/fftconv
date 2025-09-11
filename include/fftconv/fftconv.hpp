@@ -131,11 +131,11 @@ inline void multiply_cx_neon_f32(std::span<const std::complex<float>> cx1,
 }
 #endif
 
-#if defined(__AVX2__)
+#if defined(__AVX__)
 
 #include <immintrin.h>
 
-inline __m256d mult_c128_avx2(__m256d vec1, __m256d vec2) {
+inline __m256d mult_c128_avx(__m256d vec1, __m256d vec2) {
   // vec1 and vec2 each have 2 128bit complex
   const __m256d neg = _mm256_setr_pd(1.0, -1.0, 1.0, -1.0);
 
@@ -157,7 +157,7 @@ inline __m256d mult_c128_avx2(__m256d vec1, __m256d vec2) {
   return vec1;
 }
 
-inline __m256 mult_c64_avx2(__m256 vec1, __m256 vec2) {
+inline __m256 mult_c64_avx(__m256 vec1, __m256 vec2) {
   // vec1 and vec2 each have 4 64bit complex
   const __m256 neg =
       _mm256_setr_ps(1.0f, -1.0f, 1.0f, -1.0f, 1.0f, -1.0f, 1.0f, -1.0f);
@@ -172,9 +172,9 @@ inline __m256 mult_c64_avx2(__m256 vec1, __m256 vec2) {
 }
 
 template <typename T>
-inline void multiply_cx_haswell(std::span<const std::complex<T>> cx1,
-                                std::span<const std::complex<T>> cx2,
-                                std::span<std::complex<T>> out) {
+inline void multiply_cx_avx(std::span<const std::complex<T>> cx1,
+                            std::span<const std::complex<T>> cx2,
+                            std::span<std::complex<T>> out) {
   constexpr size_t simd_width = 256 / (8 * sizeof(T));
   const size_t vec_size = std::min({cx1.size(), cx2.size(), out.size()});
   const size_t vec_end = vec_size / (simd_width / 2) * (simd_width / 2);
@@ -190,7 +190,7 @@ inline void multiply_cx_haswell(std::span<const std::complex<T>> cx1,
       __m256 vec1 = _mm256_load_ps(reinterpret_cast<const float *>(&cx1[i]));
       __m256 vec2 = _mm256_load_ps(reinterpret_cast<const float *>(&cx2[i]));
 
-      // auto res = mult_c64_avx2(vec1, vec2);
+      // auto res = mult_c64_avx(vec1, vec2);
       // _mm256_storeu_ps(reinterpret_cast<float *>(&out[i]), res);
 
       __m256 vec3 = _mm256_mul_ps(vec1, vec2);
@@ -209,7 +209,7 @@ inline void multiply_cx_haswell(std::span<const std::complex<T>> cx1,
       __m256d vec1 = _mm256_load_pd(reinterpret_cast<const double *>(&cx1[i]));
       __m256d vec2 = _mm256_load_pd(reinterpret_cast<const double *>(&cx2[i]));
 
-      // auto res = mult_c128_avx2(vec1, vec2);
+      // auto res = mult_c128_avx(vec1, vec2);
       // _mm256_storeu_pd(reinterpret_cast<double *>(&out[i]), res);
 
       auto vec3 = _mm256_mul_pd(vec1, vec2);
@@ -266,9 +266,9 @@ inline void multiply_cx(std::span<const std::complex<T>> cx1,
     multiply_cx_serial(cx1, cx2, out);
   }
 
-#elif defined(__AVX2__)
+#elif defined(__AVX__)
 
-  multiply_cx_haswell<T>(cx1, cx2, out);
+  multiply_cx_avx<T>(cx1, cx2, out);
 
 #else
   multiply_cx_serial(cx1, cx2, out);
