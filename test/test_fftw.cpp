@@ -1,10 +1,84 @@
+#include "fftconv/fftconv.hpp"
 #include "test_common.hpp"
 #include <array>
 #include <fftconv/fftw.hpp>
 #include <gtest/gtest.h>
+#include <random>
 
 // NOLINTBEGIN(*-magic-numbers, *-pointer-arithmetic, *-non-private-member-*,
 // *-member-function, *-destructor)
+
+#if defined(__AVX__)
+
+template <typename T> void _TestCxMulAvx() {
+  // AVX registers are 32-byte wide
+  alignas(32) constexpr size_t lane_size = 32 / sizeof(T);
+  alignas(32) constexpr size_t n_cx = lane_size / 2;
+
+  std::array<std::complex<T>, n_cx> cx1;
+  std::array<std::complex<T>, n_cx> cx2;
+  std::array<std::complex<T>, n_cx> truth;
+  std::array<std::complex<T>, n_cx> ret;
+
+  std::random_device device;
+  std::mt19937 rng(device());
+  std::uniform_int_distribution<int> dist(1, 100);
+
+  for (int i = 0; i < n_cx; ++i) {
+    cx1[i] = {(T)dist(rng), (T)dist(rng)};
+    cx2[i] = {(T)dist(rng), (T)dist(rng)};
+    truth[i] = cx1[i] * cx2[i];
+  }
+
+  if constexpr (std::is_same_v<T, float>) {
+    __m256 vec1 = _mm256_load_ps(reinterpret_cast<float *>(&cx1));
+    __m256 vec2 = _mm256_load_ps(reinterpret_cast<float *>(&cx2));
+    _mm256_store_ps(reinterpret_cast<float *>(&ret),
+                    fftconv::internal::mult_c64_avx(vec1, vec2));
+  } else if constexpr (std::is_same_v<T, double>) {
+    __m256d vec1 = _mm256_load_pd(reinterpret_cast<double *>(&cx1));
+    __m256d vec2 = _mm256_load_pd(reinterpret_cast<double *>(&cx2));
+    _mm256_store_pd(reinterpret_cast<double *>(&ret),
+                    fftconv::internal::mult_c128_avx(vec1, vec2));
+  }
+
+  for (int i = 0; i < n_cx; ++i) {
+    ASSERT_EQ(ret[i], truth[i]);
+  }
+}
+
+TEST(TestCxMul, TestCxMulAvxFloat) { _TestCxMulAvx<float>(); }
+TEST(TestCxMul, TestCxMulAvxDouble) { _TestCxMulAvx<double>(); }
+
+#endif // __AVX__
+
+TEST(TestCxMul, TestCxMulAvxArray) {
+  using T = float;
+  const size_t N = 100;
+  std::vector<std::complex<T>> vec1(N);
+  std::vector<std::complex<T>> vec2(N);
+  std::vector<std::complex<T>> truth(N);
+  std::vector<std::complex<T>> ret(N);
+
+  std::random_device device;
+  std::mt19937 rng(device());
+  std::uniform_int_distribution<int> dist(1, 100);
+
+  for (int i = 0; i < N; ++i) {
+    vec1[i] = {(T)dist(rng), (T)dist(rng)};
+    vec2[i] = {(T)dist(rng), (T)dist(rng)};
+  }
+
+  for (int i = 0; i < N; ++i) {
+    truth[i] = vec1[i] * vec2[i];
+  }
+
+  fftconv::internal::multiply_cx_avx<T>(vec1, vec2, ret);
+
+  for (int i = 0; i < N; ++i) {
+    ASSERT_EQ(ret[i], truth[i]);
+  }
+}
 
 class FFTWPlanCreateC2C : public testing::Test {
 protected:
