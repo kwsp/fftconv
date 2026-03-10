@@ -48,20 +48,24 @@ Benchmark and test dependencies:
 
 **Python**
 
-TODO The Python wrapper is currently out of date.
+The Python package can be built by calling:
 
-A Cython wrapper is provided. Dependencies:
+```bash
+uv pip install .
+```
 
-- `Cython` for C++ bindings
+To run the Python tests and benchmarks:
+
+```bash
+uv run test.py
+```
+
+Dependencies for tests and benchmarks:
+
 - `numpy` (benchmarked against)
 - `numba` (benchmarked against)
 - `scipy` (benchmarked against)
 - `matplotlib` (plot results)
-
-```
-python3 setup.py build_ext -i
-python3 test.py # run the python test/benchmark
-```
 
 ## Benchmark results
 
