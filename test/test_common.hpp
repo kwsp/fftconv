@@ -6,8 +6,16 @@
 // Using symbol through template
 #include <fftconv/fftconv.hpp> // IWYU pragma: keep
 
-constexpr double DoubleTol{1e-9};
-constexpr float FloatTol{1e-5};
+template <fftconv::Floating T> constexpr T getTol() {
+  constexpr double DoubleTol{1e-9};
+  constexpr float FloatTol{1e-5};
+
+  if constexpr (std::is_same_v<T, float>) {
+    return FloatTol;
+  } else {
+    return DoubleTol;
+  }
+}
 
 template <fftconv::Floating T>
 void ExpectVectorsNear(const std::span<const T> actual,

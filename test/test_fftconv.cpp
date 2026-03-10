@@ -90,14 +90,6 @@ TEST(ElementwiseMultiply, HandlesDifferentSizes) {
   EXPECT_DOUBLE_EQ(result[2].imag(), 0);
 }
 
-template <fftconv::Floating T> struct Tol {};
-template <> struct Tol<float> {
-  auto operator()() { return FloatTol; }
-};
-template <> struct Tol<double> {
-  auto operator()() { return DoubleTol; }
-};
-
 TEST(FFTConvEngine, OAConvFull) {
   using T = double;
   arma::Col<T> kernel(95, arma::fill::randn);
@@ -111,7 +103,7 @@ TEST(FFTConvEngine, OAConvFull) {
     plans.oaconvolve<ConvMode::Full>(arr, kernel, res);
 
     ExpectVectorsNear(std::span<const T>(res), std::span<const T>(expected),
-                      Tol<T>()());
+                      getTol<T>());
   }
 }
 
@@ -127,7 +119,7 @@ TEST(FFTConvEngine, OAConvSame) {
 
     plans.oaconvolve<ConvMode::Same>(arr, kernel, res);
 
-    ExpectVectorsNear<T>(res, expected, Tol<T>()());
+    ExpectVectorsNear<T>(res, expected, getTol<T>());
   }
 }
 
@@ -151,7 +143,7 @@ void test_conv(Func conv_func) {
     arma::Col<T> out(outSize, arma::fill::zeros);
     conv_func(a, k, out);
 
-    ExpectVectorsNear<T>(out, expected, Tol<T>()());
+    ExpectVectorsNear<T>(out, expected, getTol<T>());
   }
 }
 
@@ -178,7 +170,7 @@ void test_oaconv(Func conv_func) {
     conv_func(a, kernel, res);
 
     ExpectVectorsNear(std::span<const T>(res), std::span<const T>(expected),
-                      Tol<T>()());
+                      getTol<T>());
   }
 }
 
