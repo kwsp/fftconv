@@ -53,7 +53,7 @@ template <fftconv::Floating T, typename Func>
 void conv_bench_same(benchmark::State &state, Func conv_func) {
   AlignedVector<T> a(state.range(0));
   AlignedVector<T> k(state.range(1));
-  AlignedVector<T> out(a.size() + k.size() - 1);
+  AlignedVector<T> out(a.size());
 
   conv_func(a, k, out);
   for (auto _ : state) {
@@ -65,7 +65,7 @@ void conv_bench_same(benchmark::State &state, Func conv_func) {
 }
 
 template <fftconv::Floating T> void BM_oaconvolve(benchmark::State &state) {
-  conv_bench_full<T>(state, fftconv::oaconvolve_fftw<T, fftconv::Same>);
+  conv_bench_full<T>(state, fftconv::oaconvolve_fftw<T, fftconv::Full>);
 }
 
 BENCHMARK(BM_oaconvolve<double>)->ArgsProduct(ARGS_FIR);
