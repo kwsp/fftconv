@@ -56,7 +56,13 @@ inline auto get_optimal_fft_size(const size_t filter_size) -> size_t {
       return pair[1];
     }
   }
-  return max_oaconv_fft_size;
+
+  // Fallback to powers of 2 for large filter sizes to prevent integer underflow
+  size_t size = max_oaconv_fft_size;
+  while (size < filter_size * 2) {
+    size *= 2;
+  }
+  return size;
 }
 
 // Copy data from src to dst and padded the extra with zero
