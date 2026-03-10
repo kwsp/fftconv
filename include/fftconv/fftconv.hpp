@@ -374,6 +374,9 @@ struct FFTConvEngine : public fftw::cache_mixin<FFTConvEngine<T>> {
     } else if constexpr (Mode == ConvMode::Same) {
       const size_t padding = k.size() / 2;
 
+      // Always use buf.real_ptr() for Same mode to ensure buffer size is
+      // correct The FFTW plan is for real_sz which is larger than out.size(),
+      // so we can't write directly to out.data()
       backward.execute_dft_c2r(buf.cx1_ptr(), buf.real_ptr());
       fftw::normalize<T>(buf.real, fct);
 
@@ -427,9 +430,11 @@ struct FFTConvEngine : public fftw::cache_mixin<FFTConvEngine<T>> {
 
         // normalize output and add to result
         if (pos < padding) {
-          fftw::normalize_add<T>(out, buf.real_span().subspan(padding), fct);
+          fftw::normalize_add<T>(out.subspan(pos),
+                                 buf.real_span().subspan(padding - pos), fct);
         } else {
-          fftw::normalize_add<T>(out.subspan(pos - padding), buf.real, fct);
+          fftw::normalize_add<T>(out.subspan(pos - padding),
+                                 buf.real_span().subspan(0), fct);
         }
       }
     } else {
