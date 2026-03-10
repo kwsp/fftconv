@@ -1,3 +1,5 @@
+.fftw_wisdom
+.fftwf_wisdom
 profile*
 # Byte-compiled / optimized / DLL files
 __pycache__/
