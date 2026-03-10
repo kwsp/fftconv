@@ -312,7 +312,7 @@ template <typename T> struct FFTConvBuffer {
 // EngineFFTConv manages the memory of the forward and backward fft plans
 // and the fftw buffers
 template <typename T, int PlannerFlag = FFTW_ESTIMATE>
-struct FFTConvEngine : public fftw::cache_mixin<FFTConvEngine<T>> {
+struct FFTConvEngine : public fftw::cache_mixin<FFTConvEngine<T, PlannerFlag>> {
   using Plan = fftw::Plan<T>;
   using Cx = fftw::Complex<T>;
   using View = const std::span<const T>;
