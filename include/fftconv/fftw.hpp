@@ -571,7 +571,7 @@ template <typename T> struct R2CSplitBuffer {
 };
 
 template <Floating T, int PlannerFlag = FFTW_ESTIMATE, bool InPlace = false>
-struct EngineDFT1D : public cache_mixin<EngineDFT1D<T>> {
+struct EngineDFT1D : public cache_mixin<EngineDFT1D<T, PlannerFlag, InPlace>> {
   using Cx = fftw::Complex<T>;
   using Plan = fftw::Plan<T>;
 
@@ -592,7 +592,7 @@ struct EngineDFT1D : public cache_mixin<EngineDFT1D<T>> {
 };
 
 template <Floating T, int PlannerFlag = FFTW_ESTIMATE>
-struct EngineR2C1D : public cache_mixin<EngineR2C1D<T>> {
+struct EngineR2C1D : public cache_mixin<EngineR2C1D<T, PlannerFlag>> {
   using Cx = fftw::Complex<T>;
   using Plan = fftw::Plan<T>;
 
