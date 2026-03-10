@@ -184,16 +184,12 @@ inline void multiply_cx_haswell(std::span<const std::complex<T>> cx1,
       __m256 vec1 = _mm256_load_ps(reinterpret_cast<const float *>(&cx1[i]));
       __m256 vec2 = _mm256_load_ps(reinterpret_cast<const float *>(&cx2[i]));
 
-      // auto res = mult_c64_avx2(vec1, vec2);
-      // _mm256_storeu_ps(reinterpret_cast<float *>(&out[i]), res);
-
-      __m256 vec3 = _mm256_mul_ps(vec1, vec2);
-      vec2 = _mm256_permute_ps(vec2, 0b10110001);
-      vec2 = _mm256_mul_ps(vec2, neg);
-      __m256 vec4 = _mm256_mul_ps(vec1, vec2);
-      vec1 = _mm256_hsub_ps(vec3, vec4);
-      vec1 = _mm256_permute_ps(vec1, 0b11011000);
-      _mm256_store_ps(reinterpret_cast<float *>(&out[i]), vec1);
+      __m256 real1 = _mm256_moveldup_ps(vec1);
+      __m256 imag1 = _mm256_movehdup_ps(vec1);
+      __m256 vec2_swapped = _mm256_permute_ps(vec2, 0xB1);
+      __m256 imag_mult = _mm256_mul_ps(imag1, vec2_swapped);
+      __m256 res = _mm256_fmaddsub_ps(real1, vec2, imag_mult);
+      _mm256_store_ps(reinterpret_cast<float *>(&out[i]), res);
     }
   } else if constexpr (std::is_same_v<T, double>) {
 
@@ -203,16 +199,12 @@ inline void multiply_cx_haswell(std::span<const std::complex<T>> cx1,
       __m256d vec1 = _mm256_load_pd(reinterpret_cast<const double *>(&cx1[i]));
       __m256d vec2 = _mm256_load_pd(reinterpret_cast<const double *>(&cx2[i]));
 
-      // auto res = mult_c128_avx2(vec1, vec2);
-      // _mm256_storeu_pd(reinterpret_cast<double *>(&out[i]), res);
-
-      auto vec3 = _mm256_mul_pd(vec1, vec2);
-      vec2 = _mm256_permute_pd(vec2, 0x5);
-      vec2 = _mm256_mul_pd(vec2, neg);
-      auto vec4 = _mm256_mul_pd(vec1, vec2);
-      vec1 = _mm256_hsub_pd(vec3, vec4);
-
-      _mm256_store_pd(reinterpret_cast<double *>(&out[i]), vec1);
+      auto real1 = _mm256_unpacklo_pd(vec1, vec1);
+      auto imag1 = _mm256_unpackhi_pd(vec1, vec1);
+      auto vec2_swapped = _mm256_permute_pd(vec2, 0x5);
+      auto imag_mult = _mm256_mul_pd(imag1, vec2_swapped);
+      auto res = _mm256_fmaddsub_pd(real1, vec2, imag_mult);
+      _mm256_store_pd(reinterpret_cast<double *>(&out[i]), res);
     }
   }
 
