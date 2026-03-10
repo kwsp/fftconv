@@ -322,7 +322,7 @@ struct FFTConvEngine : public fftw::cache_mixin<FFTConvEngine<T>> {
   using Plan = fftw::Plan<T>;
   using Cx = fftw::Complex<T>;
   using View = const std::span<const T>;
-  using MutableView = std::span<T>;
+  using MutView = std::span<T>;
 
   FFTConvBuffer<T> buf;
   Plan forward;
@@ -342,7 +342,7 @@ struct FFTConvEngine : public fftw::cache_mixin<FFTConvEngine<T>> {
   }
 
   template <ConvMode Mode = ConvMode::Full>
-  void convolve(View a, View k, MutableView out) {
+  void convolve(View a, View k, MutView out) {
     std::fill(out.begin(), out.end(), static_cast<T>(0));
 
     // Copy input to buffer
@@ -386,7 +386,7 @@ struct FFTConvEngine : public fftw::cache_mixin<FFTConvEngine<T>> {
   }
 
   template <ConvMode Mode = ConvMode::Full>
-  void oaconvolve(View a, View k, MutableView out) {
+  void oaconvolve(View a, View k, MutView out) {
     assert(buf.real.size() == internal::get_optimal_fft_size(k.size()));
     std::fill(out.begin(), out.end(), 0);
 
@@ -443,10 +443,10 @@ struct FFTConvEngine : public fftw::cache_mixin<FFTConvEngine<T>> {
     }
   }
 
-  void oaconvolve_same(View a, View k, MutableView out) {
+  void oaconvolve_same(View a, View k, MutView out) {
     oaconvolve<ConvMode::Same>(a, k, out);
   }
-  void oaconvolve_full(View a, View k, MutableView out) {
+  void oaconvolve_full(View a, View k, MutView out) {
     oaconvolve<ConvMode::Full>(a, k, out);
   }
 };
