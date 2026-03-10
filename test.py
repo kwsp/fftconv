@@ -3,17 +3,17 @@ import numpy as np
 from scipy import signal
 import numba as nb
 
-import fftconv
+import pyfftconv
 
 
 def test_conv(x, y):
     gt = np.convolve(x, y)
 
     def _test(func):
-        np.allclose(gt, func(x, y))
+        assert np.allclose(gt, func(x, y))
 
-    _test(fftconv.convolve_fftw)
-    _test(fftconv.oaconvolve_fftw)
+    _test(pyfftconv.convolve)
+    _test(pyfftconv.oaconvolve)
 
     print("Vectors are equal.")
 
@@ -34,9 +34,9 @@ def run_bench(x, y):
         )
         print(f"    ({N_RUNS} runs) {name} took {round(elapsed_ms)}ms")
 
-    _timeit("convolve_fftw", lambda: fftconv.convolve_fftw(x, y))
+    _timeit("convolve_fftw", lambda: pyfftconv.convolve(x, y))
 
-    _timeit("oaconvolve_fftw", lambda: fftconv.oaconvolve_fftw(x, y))
+    _timeit("oaconvolve_fftw", lambda: pyfftconv.oaconvolve(x, y))
 
     numba_convolve(x, y)  # warm jit
     _timeit("np.convolve", lambda: np.convolve(x, y))
