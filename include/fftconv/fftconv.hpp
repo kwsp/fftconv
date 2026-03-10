@@ -424,11 +424,10 @@ struct FFTConvEngine : public fftw::cache_mixin<FFTConvEngine<T, PlannerFlag>> {
 
         // normalize output and add to result
         if (pos < padding) {
-          fftw::normalize_add<T>(out.subspan(pos),
-                                 buf.real_span().subspan(padding - pos), fct);
+          fftw::normalize_add<T>(out, buf.real_span().subspan(padding - pos),
+                                 fct);
         } else {
-          fftw::normalize_add<T>(out.subspan(pos - padding),
-                                 buf.real_span().subspan(0), fct);
+          fftw::normalize_add<T>(out.subspan(pos - padding), buf.real, fct);
         }
       }
     } else {
