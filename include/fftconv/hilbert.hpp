@@ -35,13 +35,19 @@ void hilbert(const std::span<const T> x, const std::span<T> env) {
     engine.forward();
   }
 
-  //  Multiply by 1j
+  // Multiply by 1j (skip DC and Nyquist)
   const auto cx_size = n / 2 + 1;
   for (auto i = 0; i < cx_size; ++i) {
-    const auto re = buf.out[i][0];
-    const auto im = buf.out[i][1];
-    buf.out[i][0] = im;
-    buf.out[i][1] = -re;
+    // Skip DC (0 Hz) and Nyquist (n/2 Hz when n is even)
+    if (i == 0 || (n % 2 == 0 && i == cx_size - 1)) {
+      buf.out[i][0] = 0.0;
+      buf.out[i][1] = 0.0;
+    } else {
+      const auto re = buf.out[i][0];
+      const auto im = buf.out[i][1];
+      buf.out[i][0] = im;
+      buf.out[i][1] = -re;
+    }
   }
 
   // Execute c2r fft on modified spectrum
