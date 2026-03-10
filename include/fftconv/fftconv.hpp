@@ -59,18 +59,6 @@ inline auto get_optimal_fft_size(const size_t filter_size) -> size_t {
   return max_oaconv_fft_size;
 }
 
-// In memory cache with key type K and value type V
-template <class K, class V> auto get_cached(K key) -> V * {
-  static thread_local std::unordered_map<K, std::unique_ptr<V>> _cache;
-
-  auto &val = _cache[key];
-  if (val == nullptr) {
-    val = std::make_unique<V>(key);
-  }
-
-  return val.get();
-}
-
 // Copy data from src to dst and padded the extra with zero
 // dst_size must be greater than src_size
 template <typename T>
