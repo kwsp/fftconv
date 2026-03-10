@@ -28,9 +28,11 @@ void arma_conv(std::span<const T> span1, std::span<const T> span2,
                           true);
   // NOLINTEND(*-const-cast)
   if constexpr (Mode == fftconv::ConvMode::Same) {
-    volatile arma::Col<T> res = arma::conv(vec1, vec2, "same");
+    arma::Col<T> res = arma::conv(vec1, vec2, "same");
+    benchmark::DoNotOptimize(res);
   } else {
-    volatile arma::Col<T> res = arma::conv(vec1, vec2);
+    arma::Col<T> res = arma::conv(vec1, vec2);
+    benchmark::DoNotOptimize(res);
   }
 }
 
