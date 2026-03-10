@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.20)
 project(fftconv C CXX)
 set(CMAKE_CXX_STANDARD 20)
 
-find_package(BENCHMARK CONFIG REQUIRED)
+find_package(benchmark CONFIG REQUIRED)
 find_package(Armadillo CONFIG REQUIRED)
 find_package(FFTW3 CONFIG REQUIRED)
 find_package(FFTW3f CONFIG REQUIRED)

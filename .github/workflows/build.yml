@@ -118,3 +118,60 @@ jobs:
       - name: CTest
         shell: bash
         run: ctest --output-on-failure --test-dir build/clang/test/
+
+  Build-linux:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Export GitHub Actions cache environment variables
+        uses: actions/github-script@v7
+        with:
+          script: |
+            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Install system dependencies
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y mono-devel ninja-build pkg-config cmake clang clang-tidy
+
+      - name: Setup VCPKG
+        shell: bash
+        run: |
+          cd ${{ github.workspace }}
+          git clone https://github.com/microsoft/vcpkg
+          ${{ github.workspace }}/vcpkg/bootstrap-vcpkg.sh
+
+      - name: Add NuGet sources
+        shell: bash
+        env:
+          gh_packages_secret: ${{ secrets.GH_PACKAGES_TOKEN }}
+        if: ${{ env.gh_packages_secret != '' }}
+        run: |
+          # Use nuget via mono (since mono is not pre-installed on ubuntu, and vcpkg fetches the Windows nuget binary)
+          mono `${{ env.VCPKG_EXE }} fetch nuget | tail -n 1` \
+            sources add \
+            -Source "${{ env.FEED_URL }}" \
+            -StorePasswordInClearText \
+            -Name GitHubPackages \
+            -UserName "${{ env.USERNAME }}" \
+            -Password "${{ secrets.GH_PACKAGES_TOKEN }}"
+          mono `${{ env.VCPKG_EXE }} fetch nuget | tail -n 1` \
+            setapikey "${{ secrets.GH_PACKAGES_TOKEN }}" \
+            -Source "${{ env.FEED_URL }}"
+
+      - name: CMake configure
+        shell: bash
+        run: cmake --preset clang
+
+      - name: CMake build
+        shell: bash
+        run: cmake --build --preset clang-release
+
+      - name: CTest
+        shell: bash
+        run: ctest --output-on-failure --test-dir build/clang/test/
