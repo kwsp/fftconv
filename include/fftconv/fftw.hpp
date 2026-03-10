@@ -202,8 +202,8 @@ template <typename T> struct Plan {
                          COMMA unsigned int flags,
                      n0 COMMA n1 COMMA in COMMA out COMMA flags)
   PLAN_CREATE_METHOD(dft_c2r_3d,
-                     int n0 COMMA int n1 COMMA int n2 COMMA Complex<T> *in COMMA
-                         T *out COMMA unsigned int flags,
+                     int n0 COMMA int n1 COMMA int n2 COMMA Complex<T> *in
+                         COMMA T *out COMMA unsigned int flags,
                      n0 COMMA n1 COMMA n2 COMMA in COMMA out COMMA flags)
   PLAN_CREATE_METHOD(dft_c2r,
                      int rank COMMA int *n COMMA Complex<T> *in COMMA T *out
@@ -265,9 +265,9 @@ template <typename T> struct Plan {
   PLAN_CREATE_METHOD(
       many_dft_c2r,
       int rank COMMA const int *n COMMA int howmany COMMA Complex<T> *in
-          COMMA const int *inembed COMMA int istride COMMA int idist COMMA
-              T *out COMMA const int *onembed COMMA int ostride COMMA int odist
-                  COMMA unsigned flags,
+          COMMA const int *inembed COMMA int istride COMMA int idist
+              COMMA T *out COMMA const int *onembed COMMA int ostride
+                  COMMA int odist COMMA unsigned flags,
       rank COMMA n COMMA howmany COMMA in COMMA inembed COMMA istride COMMA
           idist COMMA out COMMA onembed COMMA ostride COMMA odist COMMA flags)
 
@@ -278,9 +278,9 @@ template <typename T> struct Plan {
   PLAN_CREATE_METHOD(
       many_r2r,
       int rank COMMA const int *n COMMA int howmany COMMA T *in
-          COMMA const int *inembed COMMA int istride COMMA int idist COMMA
-              T *out COMMA const int *onembed COMMA int ostride COMMA int odist
-                  COMMA R2RKind<T> *kind COMMA unsigned flags,
+          COMMA const int *inembed COMMA int istride COMMA int idist
+              COMMA T *out COMMA const int *onembed COMMA int ostride
+                  COMMA int odist COMMA R2RKind<T> *kind COMMA unsigned flags,
       rank COMMA n COMMA howmany COMMA in COMMA inembed COMMA istride COMMA
           idist COMMA out COMMA onembed COMMA ostride COMMA odist COMMA kind
               COMMA flags)
@@ -305,15 +305,15 @@ template <typename T> struct Plan {
           COMMA sign COMMA flags)
   PLAN_CREATE_METHOD(guru_split_dft,
                      int rank COMMA const IODim<T> *dims COMMA int howmany_rank
-                         COMMA const IODim<T> *howmany_dims COMMA T *ri COMMA
-                             T *ii COMMA T *ro COMMA T *io COMMA unsigned flags,
+                         COMMA const IODim<T> *howmany_dims COMMA T *ri COMMA T
+                             *ii COMMA T *ro COMMA T *io COMMA unsigned flags,
                      rank COMMA dims COMMA howmany_rank COMMA howmany_dims COMMA
                          ri COMMA ii COMMA ro COMMA io COMMA flags)
   PLAN_CREATE_METHOD(
       guru64_split_dft,
       int rank COMMA const IODim64<T> *dims COMMA int howmany_rank
-          COMMA const IODim64<T> *howmany_dims COMMA T *ri COMMA T *ii COMMA
-              T *ro COMMA T *io COMMA unsigned flags,
+          COMMA const IODim64<T> *howmany_dims COMMA T *ri COMMA T *ii
+              COMMA T *ro COMMA T *io COMMA unsigned flags,
       rank COMMA dims COMMA howmany_rank COMMA howmany_dims COMMA ri COMMA ii
           COMMA ro COMMA io COMMA flags)
 
@@ -328,39 +328,42 @@ template <typename T> struct Plan {
                      rank COMMA dims COMMA howmany_rank COMMA howmany_dims COMMA
                          in COMMA out COMMA flags);
   PLAN_CREATE_METHOD(guru64_dft_r2c,
-                     int rank COMMA const IODim64<T> *dims COMMA int
-                         howmany_rank COMMA const IODim64<T> *howmany_dims COMMA
-                             T *in COMMA Complex<T> *out COMMA unsigned flags,
+                     int rank COMMA const IODim64<T> *dims
+                         COMMA int howmany_rank
+                             COMMA const IODim64<T> *howmany_dims COMMA T *in
+                                 COMMA Complex<T> *out COMMA unsigned flags,
                      rank COMMA dims COMMA howmany_rank COMMA howmany_dims COMMA
                          in COMMA out COMMA flags);
   PLAN_CREATE_METHOD(guru_split_dft_r2c,
                      int rank COMMA const IODim<T> *dims COMMA int howmany_rank
-                         COMMA const IODim<T> *howmany_dims COMMA T *in COMMA
-                             T *ro COMMA T *io COMMA unsigned flags,
+                         COMMA const IODim<T> *howmany_dims COMMA T *in
+                             COMMA T *ro COMMA T *io COMMA unsigned flags,
                      rank COMMA dims COMMA howmany_rank COMMA howmany_dims COMMA
                          in COMMA ro COMMA io COMMA flags);
   PLAN_CREATE_METHOD(guru64_split_dft_r2c,
-                     int rank COMMA const IODim64<T> *dims COMMA int
-                         howmany_rank COMMA const IODim64<T> *howmany_dims COMMA
-                             T *in COMMA T *ro COMMA T *io COMMA unsigned flags,
+                     int rank COMMA const IODim64<T> *dims
+                         COMMA int howmany_rank
+                             COMMA const IODim64<T> *howmany_dims COMMA T *in
+                                 COMMA T *ro COMMA T *io COMMA unsigned flags,
                      rank COMMA dims COMMA howmany_rank COMMA howmany_dims COMMA
                          in COMMA ro COMMA io COMMA flags);
   PLAN_CREATE_METHOD(guru_dft_c2r,
                      int rank COMMA const IODim<T> *dims COMMA int howmany_rank
-                         COMMA const IODim<T> *howmany_dims COMMA
-                             fftw_complex *in COMMA T *out COMMA unsigned flags,
+                         COMMA const IODim<T> *howmany_dims COMMA fftw_complex
+                             *in COMMA T *out COMMA unsigned flags,
                      rank COMMA dims COMMA howmany_rank COMMA howmany_dims COMMA
                          in COMMA out COMMA flags);
-  PLAN_CREATE_METHOD(guru64_dft_c2r,
-                     int rank COMMA const IODim64<T> *dims COMMA int
-                         howmany_rank COMMA const IODim64<T> *howmany_dims COMMA
-                             fftw_complex *in COMMA T *out COMMA unsigned flags,
-                     rank COMMA dims COMMA howmany_rank COMMA howmany_dims COMMA
-                         in COMMA out COMMA flags);
+  PLAN_CREATE_METHOD(
+      guru64_dft_c2r,
+      int rank COMMA const IODim64<T> *dims COMMA int howmany_rank
+          COMMA const IODim64<T> *howmany_dims COMMA fftw_complex *in
+              COMMA T *out COMMA unsigned flags,
+      rank COMMA dims COMMA howmany_rank COMMA howmany_dims COMMA in COMMA out
+          COMMA flags);
   PLAN_CREATE_METHOD(guru_split_dft_c2r,
                      int rank COMMA const IODim<T> *dims COMMA int howmany_rank
-                         COMMA const IODim<T> *howmany_dims COMMA T *ri COMMA
-                             T *ii COMMA T *out COMMA unsigned flags,
+                         COMMA const IODim<T> *howmany_dims COMMA T *ri
+                             COMMA T *ii COMMA T *out COMMA unsigned flags,
                      rank COMMA dims COMMA howmany_rank COMMA howmany_dims COMMA
                          ri COMMA ii COMMA out COMMA flags);
   PLAN_CREATE_METHOD(guru64_split_dft_c2r,
@@ -376,8 +379,8 @@ template <typename T> struct Plan {
    */
   PLAN_CREATE_METHOD(guru_r2r,
                      int rank COMMA const IODim<T> *dims COMMA int howmany_rank
-                         COMMA const IODim<T> *howmany_dims COMMA T *in COMMA
-                             T *out COMMA const R2RKind<T> *kind
+                         COMMA const IODim<T> *howmany_dims COMMA T *in
+                             COMMA T *out COMMA const R2RKind<T> *kind
                                  COMMA unsigned flags,
                      rank COMMA dims COMMA howmany_rank COMMA howmany_dims COMMA
                          in COMMA out COMMA kind COMMA flags)
@@ -451,8 +454,6 @@ template <class Key, class Val> auto get_cached_stack(Key key) -> Val & {
 }
 
 template <typename Child> struct cache_mixin {
-  // static auto get(size_t n) -> Child & { return *get_cached<size_t,
-  // Child>(n); }
   static auto get(size_t n) -> Child & {
     return get_cached_stack<size_t, Child>(n);
   }
@@ -475,12 +476,14 @@ template <typename T, bool InPlace = false> struct C2CBuffer {
   C2CBuffer &operator=(const C2CBuffer &) = delete;
   C2CBuffer &operator=(C2CBuffer &&) = delete;
   ~C2CBuffer() noexcept {
-    if (in)
+    if (in) {
       fftw::free<T>(in);
+    }
 
     if constexpr (!InPlace) {
-      if (out)
+      if (out) {
         fftw::free<T>(out);
+      }
     }
   }
 };
@@ -506,16 +509,20 @@ template <typename T, bool InPlace = false> struct C2CSplitBuffer {
   C2CSplitBuffer &operator=(const C2CSplitBuffer &) = delete;
   C2CSplitBuffer &operator=(C2CSplitBuffer &&) = delete;
   ~C2CSplitBuffer() noexcept {
-    if (ri)
+    if (ri) {
       fftw::free<T>(ri);
-    if (ii)
+    }
+    if (ii) {
       fftw::free<T>(ii);
+    }
 
     if constexpr (!InPlace) {
-      if (ro)
+      if (ro) {
         fftw::free<T>(ro);
-      if (io)
+      }
+      if (io) {
         fftw::free<T>(io);
+      }
     }
   }
 };
@@ -531,10 +538,12 @@ template <typename T> struct R2CBuffer {
   R2CBuffer &operator=(const R2CBuffer &) = delete;
   R2CBuffer &operator=(R2CBuffer &&) = delete;
   ~R2CBuffer() noexcept {
-    if (in)
+    if (in) {
       fftw::free<T>(in);
-    if (out)
+    }
+    if (out) {
       fftw::free<T>(out);
+    }
   }
 };
 
@@ -549,12 +558,15 @@ template <typename T> struct R2CSplitBuffer {
   R2CSplitBuffer &operator=(const R2CSplitBuffer &) = delete;
   R2CSplitBuffer &operator=(R2CSplitBuffer &&) = delete;
   ~R2CSplitBuffer() noexcept {
-    if (in)
+    if (in) {
       fftw::free<T>(in);
-    if (ro)
+    }
+    if (ro) {
       fftw::free<T>(ro);
-    if (io)
+    }
+    if (io) {
       fftw::free<T>(io);
+    }
   }
 };
 
@@ -571,7 +583,7 @@ struct EngineDFT1D : public cache_mixin<EngineDFT1D<T>> {
       : buf(n), plan_forward(Plan::dft_1d(n, buf.in, buf.out, FFTW_FORWARD,
                                           PlannerFlag)),
         plan_backward(
-            Plan::dft_1d(n, buf.out, buf.in, FFTW_BACKWARD, PlannerFlag)){};
+            Plan::dft_1d(n, buf.out, buf.in, FFTW_BACKWARD, PlannerFlag)) {};
 
   void forward() { plan_forward.execute(); }
   void forward(const Cx *in, Cx *out) const { plan_forward.execute(in, out); }
