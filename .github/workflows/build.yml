@@ -137,7 +137,7 @@ jobs:
         shell: bash
         run: |
           sudo apt-get update
-          sudo apt-get install -y ninja-build pkg-config cmake clang clang-tidy
+          sudo apt-get install -y mono-devel ninja-build pkg-config cmake clang clang-tidy
 
       - name: Setup VCPKG
         shell: bash
@@ -152,15 +152,15 @@ jobs:
           gh_packages_secret: ${{ secrets.GH_PACKAGES_TOKEN }}
         if: ${{ env.gh_packages_secret != '' }}
         run: |
-          # Use nuget if available (since mono is not pre-installed on ubuntu, vcpkg fetches its own nuget or we can just run it)
-          `${{ env.VCPKG_EXE }} fetch nuget | tail -n 1` \
+          # Use nuget via mono (since mono is not pre-installed on ubuntu, and vcpkg fetches the Windows nuget binary)
+          mono `${{ env.VCPKG_EXE }} fetch nuget | tail -n 1` \
             sources add \
             -Source "${{ env.FEED_URL }}" \
             -StorePasswordInClearText \
             -Name GitHubPackages \
             -UserName "${{ env.USERNAME }}" \
             -Password "${{ secrets.GH_PACKAGES_TOKEN }}"
-          `${{ env.VCPKG_EXE }} fetch nuget | tail -n 1` \
+          mono `${{ env.VCPKG_EXE }} fetch nuget | tail -n 1` \
             setapikey "${{ secrets.GH_PACKAGES_TOKEN }}" \
             -Source "${{ env.FEED_URL }}"
 
