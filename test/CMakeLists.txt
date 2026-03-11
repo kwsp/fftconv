@@ -9,30 +9,42 @@ find_package(fmt CONFIG REQUIRED)
 find_package(FFTW3 CONFIG REQUIRED)
 find_package(FFTW3f CONFIG REQUIRED)
 
+add_executable(test_script_fftconv test_script.cpp)
+set_target_properties(test_script_fftconv PROPERTIES
+    CXX_STANDARD 20
+    CXX_EXTENSIONS OFF)
+target_link_libraries(test_script_fftconv
+    PRIVATE
+    FFTW3::fftw3
+    FFTW3::fftw3f
+    fmt::fmt
+    armadillo
+)
+target_include_directories(test_script_fftconv
+    PRIVATE
+    ../include
+)
 
-function(add_exe target)
-    add_executable(${target} ${ARGN})
-    set_target_properties(${target} PROPERTIES
-        CXX_STANDARD 20
-        CXX_EXTENSIONS OFF)
-    target_link_libraries(${target}
-        PRIVATE
-        FFTW3::fftw3
-        FFTW3::fftw3f
-        fmt::fmt
-        armadillo
-    )
-    target_include_directories(${target}
-        PRIVATE
-        ../include
-    )
-endfunction()
-
-add_exe(test_script_fftconv test_script.cpp)
-add_exe(test_fftconv
+add_executable(test_fftconv
     test_fftw.cpp
     test_fftconv.cpp
     test_hilbert.cpp
+    test_fftconv2d.cpp
+    test_fftconv3d.cpp
+)
+set_target_properties(test_fftconv PROPERTIES
+    CXX_STANDARD 20
+    CXX_EXTENSIONS OFF)
+target_link_libraries(test_fftconv
+    PRIVATE
+    FFTW3::fftw3
+    FFTW3::fftw3f
+    fmt::fmt
+    armadillo
+)
+target_include_directories(test_fftconv
+    PRIVATE
+    ../include
 )
 
 # On Windows, linking GTest::gmock causes gtest to not discover any tests
