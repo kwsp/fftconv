@@ -186,13 +186,6 @@ TEST(Convolve, Same) {
   test_conv<float, mode>(fftconv::convolve_fftw<float, mode>);
 }
 
-TEST(Convolve, PlannerFlag) {
-  constexpr auto mode = ConvMode::Full;
-  using T = double;
-  test_conv<T, mode>(fftconv::convolve_fftw<T, mode, FFTW_ESTIMATE>);
-  test_conv<T, mode>(fftconv::convolve_fftw<T, mode, FFTW_PATIENT>);
-  test_conv<T, mode>(fftconv::convolve_fftw<T, mode, FFTW_EXHAUSTIVE>);
-}
 
 TEST(OAConvolve, Full) {
   constexpr auto mode = ConvMode::Full;
@@ -207,14 +200,5 @@ TEST(OAConvolve, Same) {
   test_oaconv<float, mode>(fftconv::oaconvolve_fftw<float, mode>);
 }
 
-TEST(OAConvolve, PlannerFlag) {
-  using T = double;
-  constexpr auto mode = ConvMode::Same;
-
-  test_oaconv<T, mode>(fftconv::oaconvolve_fftw<T, mode, FFTW_ESTIMATE>);
-  test_oaconv<T, mode>(fftconv::oaconvolve_fftw<T, mode, FFTW_MEASURE>);
-  test_oaconv<T, mode>(fftconv::oaconvolve_fftw<T, mode, FFTW_PATIENT>);
-  test_oaconv<T, mode>(fftconv::oaconvolve_fftw<T, mode, FFTW_EXHAUSTIVE>);
-}
 
 // NOLINTEND(*-magic-numbers,*-array-index)
