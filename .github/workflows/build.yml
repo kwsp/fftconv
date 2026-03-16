@@ -65,7 +65,7 @@ jobs:
           submodules: true
 
       - name: Install dependencies
-        run: brew install meson ninja fftw armadillo fmt googletest google-benchmark
+        run: brew install meson ninja fftw armadillo fmt googletest google-benchmark pybind11
 
       - name: Meson setup
         run: meson setup builddir --buildtype=release
@@ -87,7 +87,8 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y meson ninja-build pkg-config clang \
-            libfftw3-dev libarmadillo-dev libfmt-dev libgtest-dev libbenchmark-dev
+            libfftw3-dev libarmadillo-dev libfmt-dev libgtest-dev libbenchmark-dev \
+            pybind11-dev
 
       - name: Meson setup
         run: CC=clang CXX=clang++ meson setup builddir --buildtype=release
