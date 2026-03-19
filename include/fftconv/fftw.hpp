@@ -7,8 +7,8 @@ A C++ FFTW wrapper
 #include <complex>
 #include <cstdlib>
 #include <fftw3.h>
-#include <span>
 #include <memory>
+#include <span>
 #include <type_traits>
 #include <unordered_map>
 
@@ -30,11 +30,13 @@ namespace fftw {
 struct WisdomSetup {
   explicit WisdomSetup(bool threadSafe) {
     static bool callSetup = true;
+#if defined FFTW_HAVE_THREADS
     if (threadSafe && callSetup) {
       fftw_make_planner_thread_safe();
       fftwf_make_planner_thread_safe();
       callSetup = false;
     }
+#endif
     fftw_import_wisdom_from_filename(".fftw_wisdom");
     fftwf_import_wisdom_from_filename(".fftwf_wisdom");
   }

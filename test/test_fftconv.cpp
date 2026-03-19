@@ -3,7 +3,6 @@
 #include <array>
 #include <complex>
 #include <fftw3.h>
-#include <fmt/format.h>
 #include <gtest/gtest.h>
 #include <span>
 #include <vector>

@@ -2,7 +2,6 @@
 #include <array>
 #include <cstdlib>
 #include <cstring>
-#include <fmt/format.h>
 #include <iostream>
 #include <span>
 
@@ -25,6 +24,14 @@ void bench(const arma::Col<T> &input, const arma::Col<T> &kernel) {
       [&]() { fftconv::oaconvolve_fftw<T>(input, kernel, output); }, N_RUNS);
 }
 
+template <typename T> T get_tol() {
+  if constexpr (std::is_same_v<T, double>) {
+    return 1e-9;
+  } else {
+    return 1e-5F;
+  }
+}
+
 template <typename T> void run_bench() {
   constexpr std::array<std::array<size_t, 2>, 4> test_sizes{{
       {1664, 65},
@@ -33,18 +40,11 @@ template <typename T> void run_bench() {
       {4352, 65},
   }};
 
-  T tol{};
-  if constexpr (std::is_same_v<T, double>) {
-    tol = 1e-9;
-  } else {
-    tol = 1e-5f;
-  }
-
   for (const auto [size1, size2] : test_sizes) {
     arma::Col<T> input(size1, arma::fill::randn);
     arma::Col<T> kernel(size2, arma::fill::randn);
 
-    fmt::println("=== test case ({}, {}) ===", size1, size2);
+    std::cout << "=== test case (" << size1 << ", " << size2 << ") ===\n";
 
     arma::Col<T> expected_arma = arma::conv(input, kernel, "same");
     {
@@ -55,11 +55,11 @@ template <typename T> void run_bench() {
                                                  std::span<const T>(kernel),
                                                  std::span<T>(res));
 
-      const auto equal = arma::approx_equal(res, expected_arma, "absdiff", tol);
+      const auto equal = arma::approx_equal(res, expected_arma, "absdiff", get_tol<T>());
       if (!equal) {
-        fmt::println("Test failed.");
+        std::cout << "Test failed.\n";
       } else {
-        fmt::println("Test passed.");
+        std::cout << "Test passed.\n";
       }
     }
 

@@ -1,8 +1,7 @@
 armadillo_dep = dependency('armadillo')
-fmt_dep = dependency('fmt')
 gtest_dep = dependency('gtest')
 
-test_common_deps = [fftw3_dep, fftw3f_dep, fmt_dep, armadillo_dep]
+test_common_deps = [fftw3_dep, fftw3f_dep, armadillo_dep]
 
 executable('test_script_fftconv',
   'test_script.cpp',
