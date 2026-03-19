@@ -8,10 +8,8 @@
 #include <complex>
 #include <fftconv/aligned_vector.hpp>
 #include <fftconv/fftw.hpp>
-#include <memory>
 #include <span>
 #include <type_traits>
-#include <unordered_map>
 
 // NOLINTBEGIN(*-reinterpret-cast, *-const-cast, *-pointer-arithmetic)
 
@@ -386,12 +384,11 @@ struct FFTConvEngine : public fftw::cache_mixin<FFTConvEngine<T, PlannerFlag>> {
 
     const size_t fft_size = buf.real.size();
     const size_t step_size = fft_size - (k.size() - 1);
+    const T fct = static_cast<T>(1. / fft_size);
 
     // forward fft of kernel and save to complex2
     internal::copy_to_padded_buffer<T>(k, buf.real);
     forward.execute_dft_r2c(buf.real_ptr(), buf.cx2_ptr());
-
-    const auto fct = static_cast<T>(1. / fft_size);
 
     if constexpr (Mode == ConvMode::Full) {
       assert(a.size() + k.size() - 1 == out.size());
@@ -450,7 +447,7 @@ struct FFTConvEngine : public fftw::cache_mixin<FFTConvEngine<T, PlannerFlag>> {
 //    * Cache fftw_plan
 //    * Reuse buffers (no malloc on second call to the same convolution size)
 // https://en.wikipedia.org/w/index.php?title=Convolution#Fast_convolution_algorithms
-template <Floating T, ConvMode Mode = ConvMode::Same,
+template <Floating T, ConvMode Mode = ConvMode::Full,
           int PlannerFlag = FFTW_ESTIMATE>
 void convolve_fftw(const std::span<const T> input,
                    const std::span<const T> kernel, std::span<T> output) {
@@ -471,7 +468,7 @@ For "Same" mode, output_size == input_size
 2. convolve with kernel using fft of length N.
 3. add blocks together
  */
-template <Floating T, ConvMode Mode = ConvMode::Same,
+template <Floating T, ConvMode Mode = ConvMode::Full,
           int PlannerFlag = FFTW_ESTIMATE>
 void oaconvolve_fftw(std::span<const T> input, std::span<const T> kernel,
                      std::span<T> output) {

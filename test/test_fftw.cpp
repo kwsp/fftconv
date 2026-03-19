@@ -285,8 +285,6 @@ TEST_F(FFTWPlanCreateC2CSplit, GuruPlanSplitCorrect) {
       0.,          1.10366614,  0.83078287,  -2.11848431, 0.42226181,
       -1.67620125, 0.23602404,  -0.43823534, 0.35119795,  0.70254131};
 
-  alignas(32) std::array<T, 20> ri_{};
-  alignas(32) std::array<T, 20> ro_{};
 
   auto pf = fftw::Plan<T>::guru_split_dft(rank, &dim, howmany, &howmany_dim,
                                           ri.data(), ii.data(), ro.data(),

@@ -1,6 +1,6 @@
 [build-system]
-requires = ["scikit-build-core>=0.10", "pybind11"]
-build-backend = "scikit_build_core.build"
+requires = ["meson-python", "pybind11"]
+build-backend = "mesonpy"
 
 [project]
 name = "pyfftconv"
@@ -16,20 +16,3 @@ classifiers = [
 
 [project.urls]
 homepage = "https://github.com/kwsp/fftconv"
-
-[tool.scikit-build]
-minimum-version = "build-system.requires"
-logging.level = "INFO"
-
-cmake.version = ">=3.20"
-cmake.args = [
-    "--preset=clang",
-    "-GNinja",        # -GNinja overrides the "Ninja Multi-Config" defined in the preset
-]
-cmake.build-type = "Release"
-cmake.source-dir = "."
-
-build.verbose = true
-build.targets = ["_pyfftconv"]
-
-wheel.packages = ["py/pyfftconv"]

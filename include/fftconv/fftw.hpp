@@ -7,8 +7,8 @@ A C++ FFTW wrapper
 #include <complex>
 #include <cstdlib>
 #include <fftw3.h>
-#include <span>
 #include <memory>
+#include <span>
 #include <type_traits>
 #include <unordered_map>
 
@@ -20,7 +20,8 @@ A C++ FFTW wrapper
 #include <arm_neon.h>
 #endif
 
-// NOLINTBEGIN(*-pointer-arithmetic, *-macro-usage, *-const-cast)
+// NOLINTBEGIN(*-pointer-arithmetic, *-macro-usage, *-const-cast,
+// *-math-missing-parenthesis)
 
 namespace fftw {
 
@@ -31,8 +32,10 @@ struct WisdomSetup {
   explicit WisdomSetup(bool threadSafe) {
     static bool callSetup = true;
     if (threadSafe && callSetup) {
+#if defined FFTW_HAVE_THREADS
       fftw_make_planner_thread_safe();
       fftwf_make_planner_thread_safe();
+#endif
       callSetup = false;
     }
     fftw_import_wisdom_from_filename(".fftw_wisdom");
@@ -625,7 +628,7 @@ Helper functions
 out[i] += in[i] * fct
  */
 template <typename T>
-inline void normalize_add(T *out, T *in, size_t len, T fct) {
+inline void normalize_add(T *out, const T *in, size_t len, T fct) {
   for (size_t i = 0; i < len; ++i) {
     out[i] += in[i] * fct;
   }
@@ -637,9 +640,7 @@ out[i] += in[i] * fct
 template <typename T>
 inline void normalize_add(std::span<T> out, std::span<const T> in, T fct) {
   const auto len = std::min(out.size(), in.size());
-  for (size_t i = 0; i < len; ++i) {
-    out[i] += in[i] * fct;
-  }
+  normalize_add<T>(out.data(), in.data(), len, fct);
 }
 
 /**
@@ -925,4 +926,5 @@ void scale_imag_and_magnitude(T const *real, T const *imag, T fct, size_t n,
 
 } // namespace fftw
 
-// NOLINTEND(*-pointer-arithmetic, *-macro-usage, *-const-cast)
+// NOLINTEND(*-pointer-arithmetic, *-macro-usage, *-const-cast,
+// *-math-missing-parenthesis)
