@@ -20,7 +20,8 @@ A C++ FFTW wrapper
 #include <arm_neon.h>
 #endif
 
-// NOLINTBEGIN(*-pointer-arithmetic, *-macro-usage, *-const-cast)
+// NOLINTBEGIN(*-pointer-arithmetic, *-macro-usage, *-const-cast,
+// *-math-missing-parenthesis)
 
 namespace fftw {
 
@@ -30,13 +31,13 @@ namespace fftw {
 struct WisdomSetup {
   explicit WisdomSetup(bool threadSafe) {
     static bool callSetup = true;
-#if defined FFTW_HAVE_THREADS
     if (threadSafe && callSetup) {
+#if defined FFTW_HAVE_THREADS
       fftw_make_planner_thread_safe();
       fftwf_make_planner_thread_safe();
+#endif
       callSetup = false;
     }
-#endif
     fftw_import_wisdom_from_filename(".fftw_wisdom");
     fftwf_import_wisdom_from_filename(".fftwf_wisdom");
   }
@@ -925,4 +926,5 @@ void scale_imag_and_magnitude(T const *real, T const *imag, T fct, size_t n,
 
 } // namespace fftw
 
-// NOLINTEND(*-pointer-arithmetic, *-macro-usage, *-const-cast)
+// NOLINTEND(*-pointer-arithmetic, *-macro-usage, *-const-cast,
+// *-math-missing-parenthesis)
