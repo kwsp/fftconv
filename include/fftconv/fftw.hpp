@@ -627,7 +627,7 @@ Helper functions
 out[i] += in[i] * fct
  */
 template <typename T>
-inline void normalize_add(T *out, T *in, size_t len, T fct) {
+inline void normalize_add(T *out, const T *in, size_t len, T fct) {
   for (size_t i = 0; i < len; ++i) {
     out[i] += in[i] * fct;
   }
@@ -639,9 +639,7 @@ out[i] += in[i] * fct
 template <typename T>
 inline void normalize_add(std::span<T> out, std::span<const T> in, T fct) {
   const auto len = std::min(out.size(), in.size());
-  for (size_t i = 0; i < len; ++i) {
-    out[i] += in[i] * fct;
-  }
+  normalize_add<T>(out.data(), in.data(), len, fct);
 }
 
 /**
