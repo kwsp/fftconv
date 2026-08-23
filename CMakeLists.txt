@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.26)
+cmake_minimum_required(VERSION 3.20)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
@@ -13,5 +13,7 @@ add_subdirectory(test)
 # Build benchmark
 add_subdirectory(benchmark)
 
-# Build python bindings
-# add_subdirectory(py)
+# Build python bindings (only when building a wheel via scikit-build-core)
+if(SKBUILD)
+  add_subdirectory(py)
+endif()
