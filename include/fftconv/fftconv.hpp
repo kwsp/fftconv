@@ -6,8 +6,10 @@
 #include <array>
 #include <cassert>
 #include <complex>
+#include <cstddef>
 #include <fftconv/aligned_vector.hpp>
 #include <fftconv/fftw.hpp>
+#include <functional>
 #include <memory>
 #include <span>
 #include <type_traits>
@@ -16,6 +18,20 @@
 // NOLINTBEGIN(*-reinterpret-cast, *-const-cast, *-pointer-arithmetic)
 
 #define FFTCONV_VERSION "0.5.1"
+
+// Hash specialization for std::array to use as unordered_map key
+namespace std {
+template <typename T, size_t N>
+struct hash<std::array<T, N>> {
+  size_t operator()(const std::array<T, N>& arr) const noexcept {
+    size_t seed = 0;
+    for (const auto& val : arr) {
+      seed ^= hash<T>{}(val) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+    }
+    return seed;
+  }
+};
+} // namespace std
 
 namespace fftconv {
 using fftw::Floating;
@@ -477,6 +493,376 @@ void oaconvolve_fftw(std::span<const T> input, std::span<const T> kernel,
                      std::span<T> output) {
   auto &plan = FFTConvEngine<T, PlannerFlag>::get_for_ksize(kernel.size());
   plan.template oaconvolve<Mode>(input, kernel, output);
+}
+
+// ============================================
+// Multi-Dimensional (ND) Convolution Support
+// ============================================
+
+namespace internal_nd {
+
+// Helper to compute total number of elements from dimensions
+template <size_t Rank>
+inline size_t total_size(const std::array<size_t, Rank>& dims) {
+  size_t total = 1;
+  for (size_t d : dims) total *= d;
+  return total;
+}
+
+// Compute linear index from row-major coordinates
+template <size_t Rank>
+inline size_t linear_index(const std::array<size_t, Rank>& coords,
+                            const std::array<size_t, Rank>& dims) {
+  size_t idx = 0;
+  size_t stride = 1;
+  for (int i = static_cast<int>(Rank) - 1; i >= 0; --i) {
+    idx += coords[i] * stride;
+    stride *= dims[i];
+  }
+  return idx;
+}
+
+// Copy N-dimensional data with zero-padding
+template <typename T, size_t Rank>
+void copy_to_padded_buffer_nd(const std::span<const T> src,
+                               const std::array<size_t, Rank>& src_dims,
+                               std::span<T> dst,
+                               const std::array<size_t, Rank>& dst_dims) {
+  std::fill(dst.begin(), dst.end(), static_cast<T>(0));
+
+  // Copy row by row for efficiency
+  if constexpr (Rank == 1) {
+    std::copy(src.begin(), src.end(), dst.begin());
+  } else if constexpr (Rank == 2) {
+    size_t src_rows = src_dims[0];
+    size_t src_cols = src_dims[1];
+    size_t dst_cols = dst_dims[1];
+
+    for (size_t r = 0; r < src_rows; ++r) {
+      const T* src_row = src.data() + r * src_cols;
+      T* dst_row = dst.data() + r * dst_cols;
+      std::copy(src_row, src_row + src_cols, dst_row);
+    }
+  } else if constexpr (Rank == 3) {
+    size_t src_depth = src_dims[0];
+    size_t src_rows = src_dims[1];
+    size_t src_cols = src_dims[2];
+    size_t dst_rows = dst_dims[1];
+    size_t dst_cols = dst_dims[2];
+
+    for (size_t d = 0; d < src_depth; ++d) {
+      for (size_t r = 0; r < src_rows; ++r) {
+        const T* src_slice = src.data() + d * src_rows * src_cols + r * src_cols;
+        T* dst_slice = dst.data() + d * dst_rows * dst_cols + r * dst_cols;
+        std::copy(src_slice, src_slice + src_cols, dst_slice);
+      }
+    }
+  }
+}
+
+// Extract "Same" region from full convolution result
+template <typename T, size_t Rank>
+void extract_same_region(const std::span<const T> full,
+                         const std::array<size_t, Rank>& full_dims,
+                         std::span<T> same,
+                         const std::array<size_t, Rank>& same_dims,
+                         const std::array<size_t, Rank>& kernel_dims) {
+  // Compute padding for each dimension
+  std::array<size_t, Rank> padding;
+  for (size_t i = 0; i < Rank; ++i) {
+    padding[i] = kernel_dims[i] / 2;
+  }
+
+  if constexpr (Rank == 1) {
+    std::copy(full.begin() + padding[0],
+              full.begin() + padding[0] + same_dims[0],
+              same.begin());
+  } else if constexpr (Rank == 2) {
+    size_t full_cols = full_dims[1];
+    size_t same_cols = same_dims[1];
+    size_t same_rows = same_dims[0];
+
+    for (size_t r = 0; r < same_rows; ++r) {
+      const T* full_row = full.data() + (r + padding[0]) * full_cols + padding[1];
+      T* same_row = same.data() + r * same_cols;
+      std::copy(full_row, full_row + same_cols, same_row);
+    }
+  } else if constexpr (Rank == 3) {
+    size_t full_rows = full_dims[1];
+    size_t full_cols = full_dims[2];
+    size_t same_depth = same_dims[0];
+    size_t same_rows = same_dims[1];
+    size_t same_cols = same_dims[2];
+
+    for (size_t d = 0; d < same_depth; ++d) {
+      for (size_t r = 0; r < same_rows; ++r) {
+        const T* full_slice = full.data() +
+          (d + padding[0]) * full_rows * full_cols +
+          (r + padding[1]) * full_cols + padding[2];
+        T* same_slice = same.data() +
+          d * same_rows * same_cols + r * same_cols;
+        std::copy(full_slice, full_slice + same_cols, same_slice);
+      }
+    }
+  }
+}
+
+// Copy kernel to padded buffer (for ND) - specialized for 2D and 3D
+template <typename T, size_t Rank>
+void copy_kernel_to_padded_buffer_nd(const std::span<const T> src,
+                                      const std::array<size_t, Rank>& src_dims,
+                                      std::span<T> dst,
+                                      const std::array<size_t, Rank>& dst_dims) {
+  std::fill(dst.begin(), dst.end(), static_cast<T>(0));
+
+  // For convolution, we need to place the kernel in the top-left
+  // (FFT convolution uses circular convolution)
+  if constexpr (Rank == 1) {
+    std::copy(src.begin(), src.end(), dst.begin());
+  } else if constexpr (Rank == 2) {
+    size_t src_rows = src_dims[0];
+    size_t src_cols = src_dims[1];
+    size_t dst_cols = dst_dims[1];
+
+    for (size_t r = 0; r < src_rows; ++r) {
+      const T* src_row = src.data() + r * src_cols;
+      T* dst_row = dst.data() + r * dst_cols;
+      std::copy(src_row, src_row + src_cols, dst_row);
+    }
+  } else if constexpr (Rank == 3) {
+    size_t src_depth = src_dims[0];
+    size_t src_rows = src_dims[1];
+    size_t src_cols = src_dims[2];
+    size_t dst_rows = dst_dims[1];
+    size_t dst_cols = dst_dims[2];
+
+    for (size_t d = 0; d < src_depth; ++d) {
+      for (size_t r = 0; r < src_rows; ++r) {
+        const T* src_slice = src.data() + d * src_rows * src_cols + r * src_cols;
+        T* dst_slice = dst.data() + d * dst_rows * dst_cols + r * dst_cols;
+        std::copy(src_slice, src_slice + src_cols, dst_slice);
+      }
+    }
+  }
+}
+
+// Compute complex output size for R2C FFT in ND
+template <size_t Rank>
+inline size_t complex_output_size(const std::array<size_t, Rank>& real_dims) {
+  size_t size = 1;
+  for (size_t i = 0; i < Rank - 1; ++i) {
+    size *= real_dims[i];
+  }
+  size *= (real_dims[Rank - 1] / 2 + 1);
+  return size;
+}
+
+} // namespace internal_nd
+
+// Cache mixin for multi-dimensional keys
+template <typename Child, size_t Rank>
+struct cache_mixin_nd {
+  using Key = std::array<size_t, Rank>;
+
+  static auto get(Key dims) -> Child& {
+    thread_local std::unordered_map<Key, std::unique_ptr<Child>> cache;
+
+    auto& val = cache[dims];
+    if (val == nullptr) {
+      val = std::make_unique<Child>(dims);
+    }
+    return *val;
+  }
+};
+
+// Multi-dimensional FFT convolution buffer
+template <typename T, size_t Rank>
+struct FFTConvBufferND {
+  using Cx = std::complex<T>;
+
+  std::array<size_t, Rank> padded_dims;
+  AlignedVector<T> real;
+  AlignedVector<Cx> cx1;
+  AlignedVector<Cx> cx2;
+
+  explicit FFTConvBufferND(const std::array<size_t, Rank>& pdims)
+      : padded_dims(pdims),
+        real(internal_nd::total_size(pdims)),
+        cx1(internal_nd::complex_output_size(pdims)),
+        cx2(internal_nd::complex_output_size(pdims)) {}
+
+  auto real_ptr() -> T* { return real.data(); }
+  auto cx1_ptr() -> fftw::Complex<T>* {
+    return reinterpret_cast<fftw::Complex<T>*>(cx1.data());
+  }
+  auto cx2_ptr() -> fftw::Complex<T>* {
+    return reinterpret_cast<fftw::Complex<T>*>(cx2.data());
+  }
+
+  auto real_span() -> std::span<T> { return real; }
+  auto cx1_span() -> std::span<Cx> { return cx1; }
+  auto cx2_span() -> std::span<Cx> { return cx2; }
+};
+
+// Helper to create FFTW R2C plan for ND
+template <typename T, size_t Rank>
+auto create_r2c_plan(const std::array<size_t, Rank>& dims,
+                      T* in, fftw::Complex<T>* out,
+                      unsigned int flags) -> fftw::Plan<T> {
+  if constexpr (Rank == 2) {
+    return fftw::Plan<T>::dft_r2c_2d(
+        static_cast<int>(dims[0]), static_cast<int>(dims[1]),
+        in, out, flags);
+  } else if constexpr (Rank == 3) {
+    return fftw::Plan<T>::dft_r2c_3d(
+        static_cast<int>(dims[0]), static_cast<int>(dims[1]), static_cast<int>(dims[2]),
+        in, out, flags);
+  } else {
+    static_assert(Rank == 2 || Rank == 3, "Only 2D and 3D supported");
+    return {};
+  }
+}
+
+// Helper to create FFTW C2R plan for ND
+template <typename T, size_t Rank>
+auto create_c2r_plan(const std::array<size_t, Rank>& dims,
+                      fftw::Complex<T>* in, T* out,
+                      unsigned int flags) -> fftw::Plan<T> {
+  if constexpr (Rank == 2) {
+    return fftw::Plan<T>::dft_c2r_2d(
+        static_cast<int>(dims[0]), static_cast<int>(dims[1]),
+        in, out, flags);
+  } else if constexpr (Rank == 3) {
+    return fftw::Plan<T>::dft_c2r_3d(
+        static_cast<int>(dims[0]), static_cast<int>(dims[1]), static_cast<int>(dims[2]),
+        in, out, flags);
+  } else {
+    static_assert(Rank == 2 || Rank == 3, "Only 2D and 3D supported");
+    return {};
+  }
+}
+
+// Multi-dimensional FFT convolution engine
+template <typename T, size_t Rank, int PlannerFlag = FFTW_ESTIMATE>
+struct FFTConvEngineND : public cache_mixin_nd<FFTConvEngineND<T, Rank, PlannerFlag>, Rank> {
+  using Plan = fftw::Plan<T>;
+  using Cx = fftw::Complex<T>;
+  using Key = std::array<size_t, Rank>;
+
+  FFTConvBufferND<T, Rank> buf;
+  Plan forward;
+  Plan backward;
+
+  explicit FFTConvEngineND(Key padded_dims)
+      : buf(padded_dims),
+        forward(create_r2c_plan<T, Rank>(padded_dims, buf.real_ptr(), buf.cx1_ptr(), PlannerFlag)),
+        backward(create_c2r_plan<T, Rank>(padded_dims, buf.cx1_ptr(), buf.real_ptr(), PlannerFlag)) {}
+
+  template <ConvMode Mode = ConvMode::Full>
+  void convolve(const std::span<const T> input, const Key& input_dims,
+                const std::span<const T> kernel, const Key& kernel_dims,
+                std::span<T> output, const Key& output_dims) {
+    std::fill(output.begin(), output.end(), static_cast<T>(0));
+
+    // Forward FFT of input
+    internal_nd::copy_to_padded_buffer_nd<T, Rank>(input, input_dims, buf.real, buf.padded_dims);
+    forward.execute_dft_r2c(buf.real_ptr(), buf.cx1_ptr());
+
+    // Forward FFT of kernel
+    internal_nd::copy_kernel_to_padded_buffer_nd<T, Rank>(kernel, kernel_dims, buf.real, buf.padded_dims);
+    forward.execute_dft_r2c(buf.real_ptr(), buf.cx2_ptr());
+
+    // Complex element-wise multiplication
+    internal::multiply_cx<T>(buf.cx1, buf.cx2, buf.cx1);
+
+    // Inverse FFT
+    const T fct = static_cast<T>(1.0) / internal_nd::total_size(buf.padded_dims);
+
+    if constexpr (Mode == ConvMode::Full) {
+      backward.execute_dft_c2r(buf.cx1_ptr(), buf.real_ptr());
+      fftw::normalize<T>(buf.real, fct);
+
+      // Copy the full result
+      const size_t full_size = internal_nd::total_size(output_dims);
+      std::copy(buf.real.begin(), buf.real.begin() + full_size, output.begin());
+
+    } else if constexpr (Mode == ConvMode::Same) {
+      backward.execute_dft_c2r(buf.cx1_ptr(), buf.real_ptr());
+      fftw::normalize<T>(buf.real, fct);
+
+      // Extract the "same" region
+      internal_nd::extract_same_region<T, Rank>(buf.real, buf.padded_dims,
+                                                  output, output_dims, kernel_dims);
+    }
+  }
+};
+
+// ==========================================
+// 2D Convolution Public API
+// ==========================================
+
+template <Floating T, ConvMode Mode = ConvMode::Same,
+          int PlannerFlag = FFTW_ESTIMATE>
+void convolve_fftw_2d(const std::span<const T> input, size_t rows, size_t cols,
+                       const std::span<const T> kernel, size_t krows, size_t kcols,
+                       std::span<T> output, size_t orows, size_t ocols) {
+  const std::array<size_t, 2> input_dims = {rows, cols};
+  const std::array<size_t, 2> kernel_dims = {krows, kcols};
+  const std::array<size_t, 2> output_dims = {orows, ocols};
+  std::array<size_t, 2> padded_dims;
+
+  for (size_t i = 0; i < 2; ++i) {
+    padded_dims[i] = input_dims[i] + kernel_dims[i] - 1;
+  }
+
+  auto& engine = FFTConvEngineND<T, 2, PlannerFlag>::get(padded_dims);
+  engine.template convolve<Mode>(input, input_dims, kernel, kernel_dims, output, output_dims);
+}
+
+// Convenience overloads for 2D
+template <Floating T, ConvMode Mode = ConvMode::Same,
+          int PlannerFlag = FFTW_ESTIMATE>
+void convolve_fftw_2d(const std::span<const T> input, const std::array<size_t, 2>& input_dims,
+                       const std::span<const T> kernel, const std::array<size_t, 2>& kernel_dims,
+                       std::span<T> output, const std::array<size_t, 2>& output_dims) {
+  convolve_fftw_2d<T, Mode, PlannerFlag>(
+      input, input_dims[0], input_dims[1],
+      kernel, kernel_dims[0], kernel_dims[1],
+      output, output_dims[0], output_dims[1]);
+}
+
+// ==========================================
+// 3D Convolution Public API
+// ==========================================
+
+template <Floating T, ConvMode Mode = ConvMode::Same,
+          int PlannerFlag = FFTW_ESTIMATE>
+void convolve_fftw_3d(const std::span<const T> input, size_t depth, size_t rows, size_t cols,
+                       const std::span<const T> kernel, size_t kdepth, size_t krows, size_t kcols,
+                       std::span<T> output, size_t odepth, size_t orows, size_t ocols) {
+  const std::array<size_t, 3> input_dims = {depth, rows, cols};
+  const std::array<size_t, 3> kernel_dims = {kdepth, krows, kcols};
+  const std::array<size_t, 3> output_dims = {odepth, orows, ocols};
+  std::array<size_t, 3> padded_dims;
+
+  for (size_t i = 0; i < 3; ++i) {
+    padded_dims[i] = input_dims[i] + kernel_dims[i] - 1;
+  }
+
+  auto& engine = FFTConvEngineND<T, 3, PlannerFlag>::get(padded_dims);
+  engine.template convolve<Mode>(input, input_dims, kernel, kernel_dims, output, output_dims);
+}
+
+// Convenience overloads for 3D
+template <Floating T, ConvMode Mode = ConvMode::Same,
+          int PlannerFlag = FFTW_ESTIMATE>
+void convolve_fftw_3d(const std::span<const T> input, const std::array<size_t, 3>& input_dims,
+                       const std::span<const T> kernel, const std::array<size_t, 3>& kernel_dims,
+                       std::span<T> output, const std::array<size_t, 3>& output_dims) {
+  convolve_fftw_3d<T, Mode, PlannerFlag>(
+      input, input_dims[0], input_dims[1], input_dims[2],
+      kernel, kernel_dims[0], kernel_dims[1], kernel_dims[2],
+      output, output_dims[0], output_dims[1], output_dims[2]);
 }
 
 } // namespace fftconv

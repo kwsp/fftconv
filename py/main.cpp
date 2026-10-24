@@ -131,8 +131,139 @@ template <typename T> static py::array_t<T> hilbert(py::array_t<T> a) {
   return out;
 }
 
+// 2D Convolution
+template <typename T>
+static void convolve2d_(py::array_t<T> a, py::array_t<T> k, py::array_t<T> out,
+                         const std::string &modeStr) {
+  py::buffer_info bufIn = a.request();
+  py::buffer_info bufK = k.request();
+  py::buffer_info bufOut = out.request();
+
+  if (bufIn.ndim != 2 || bufK.ndim != 2 || bufOut.ndim != 2) {
+    throw std::runtime_error("Number of dimensions must be two");
+  }
+
+  size_t rows = static_cast<size_t>(bufIn.shape[0]);
+  size_t cols = static_cast<size_t>(bufIn.shape[1]);
+  size_t krows = static_cast<size_t>(bufK.shape[0]);
+  size_t kcols = static_cast<size_t>(bufK.shape[1]);
+  size_t orows = static_cast<size_t>(bufOut.shape[0]);
+  size_t ocols = static_cast<size_t>(bufOut.shape[1]);
+
+  const auto mode = parseConvMode(modeStr);
+  if (mode == ConvMode::Same) {
+    fftconv::convolve_fftw_2d<T, ConvMode::Same>(
+        as_span(a), rows, cols, as_span(k), krows, kcols,
+        as_mutable_span(out), orows, ocols);
+  } else {
+    fftconv::convolve_fftw_2d<T, ConvMode::Full>(
+        as_span(a), rows, cols, as_span(k), krows, kcols,
+        as_mutable_span(out), orows, ocols);
+  }
+}
+
+template <typename T>
+static py::array_t<T> convolve2d(py::array_t<T> a, py::array_t<T> k,
+                                   const std::string &modeStr) {
+  py::buffer_info bufIn = a.request();
+  py::buffer_info bufK = k.request();
+
+  if (bufIn.ndim != 2 || bufK.ndim != 2) {
+    throw std::runtime_error("Number of dimensions must be two");
+  }
+
+  size_t rows = static_cast<size_t>(bufIn.shape[0]);
+  size_t cols = static_cast<size_t>(bufIn.shape[1]);
+  size_t krows = static_cast<size_t>(bufK.shape[0]);
+  size_t kcols = static_cast<size_t>(bufK.shape[1]);
+
+  const auto mode = parseConvMode(modeStr);
+  py::array_t<T> out;
+
+  if (mode == ConvMode::Same) {
+    out = py::array_t<T>({rows, cols});
+  } else {
+    out = py::array_t<T>({rows + krows - 1, cols + kcols - 1});
+  }
+
+  convolve2d_(a, k, out, modeStr);
+  return out;
+}
+
+// 3D Convolution
+template <typename T>
+static void convolve3d_(py::array_t<T> a, py::array_t<T> k, py::array_t<T> out,
+                         const std::string &modeStr) {
+  py::buffer_info bufIn = a.request();
+  py::buffer_info bufK = k.request();
+  py::buffer_info bufOut = out.request();
+
+  if (bufIn.ndim != 3 || bufK.ndim != 3 || bufOut.ndim != 3) {
+    throw std::runtime_error("Number of dimensions must be three");
+  }
+
+  size_t depth = static_cast<size_t>(bufIn.shape[0]);
+  size_t rows = static_cast<size_t>(bufIn.shape[1]);
+  size_t cols = static_cast<size_t>(bufIn.shape[2]);
+  size_t kdepth = static_cast<size_t>(bufK.shape[0]);
+  size_t krows = static_cast<size_t>(bufK.shape[1]);
+  size_t kcols = static_cast<size_t>(bufK.shape[2]);
+  size_t odepth = static_cast<size_t>(bufOut.shape[0]);
+  size_t orows = static_cast<size_t>(bufOut.shape[1]);
+  size_t ocols = static_cast<size_t>(bufOut.shape[2]);
+
+  const auto mode = parseConvMode(modeStr);
+  if (mode == ConvMode::Same) {
+    fftconv::convolve_fftw_3d<T, ConvMode::Same>(
+        as_span(a), depth, rows, cols, as_span(k), kdepth, krows, kcols,
+        as_mutable_span(out), odepth, orows, ocols);
+  } else {
+    fftconv::convolve_fftw_3d<T, ConvMode::Full>(
+        as_span(a), depth, rows, cols, as_span(k), kdepth, krows, kcols,
+        as_mutable_span(out), odepth, orows, ocols);
+  }
+}
+
+template <typename T>
+static py::array_t<T> convolve3d(py::array_t<T> a, py::array_t<T> k,
+                                   const std::string &modeStr) {
+  py::buffer_info bufIn = a.request();
+  py::buffer_info bufK = k.request();
+
+  if (bufIn.ndim != 3 || bufK.ndim != 3) {
+    throw std::runtime_error("Number of dimensions must be three");
+  }
+
+  size_t depth = static_cast<size_t>(bufIn.shape[0]);
+  size_t rows = static_cast<size_t>(bufIn.shape[1]);
+  size_t cols = static_cast<size_t>(bufIn.shape[2]);
+  size_t kdepth = static_cast<size_t>(bufK.shape[0]);
+  size_t krows = static_cast<size_t>(bufK.shape[1]);
+  size_t kcols = static_cast<size_t>(bufK.shape[2]);
+
+  const auto mode = parseConvMode(modeStr);
+  py::array_t<T> out;
+
+  if (mode == ConvMode::Same) {
+    out = py::array_t<T>({depth, rows, cols});
+  } else {
+    out = py::array_t<T>({depth + kdepth - 1, rows + krows - 1, cols + kcols - 1});
+  }
+
+  convolve3d_(a, k, out, modeStr);
+  return out;
+}
+
 const char *const convolve_doc = R"delimiter(
 Performs convolution using FFTW. API compatible with np.convolve
+)delimiter";
+
+const char *const convolve2d_doc = R"delimiter(
+Performs 2D convolution using FFTW. Similar to scipy.signal.convolve2d
+)delimiter";
+
+const char *const convolve3d_doc = R"delimiter(
+Performs 3D convolution using FFTW. Similar to scipy.signal.convolve
 )delimiter";
 
 const char *const oaconvolve_doc = R"delimiter(
@@ -156,6 +287,24 @@ PYBIND11_MODULE(_pyfftconv, m) {
         py::arg("out"), py::arg("mode") = "full", convolve_doc);
   m.def("convolve_", convolve_<float>, py::arg("a"), py::arg("k"),
         py::arg("out"), py::arg("mode") = "full", convolve_doc);
+
+  m.def("convolve2d", convolve2d<double>, py::arg("a"), py::arg("k"),
+        py::arg("mode") = "full", convolve2d_doc);
+  m.def("convolve2d", convolve2d<float>, py::arg("a"), py::arg("k"),
+        py::arg("mode") = "full", convolve2d_doc);
+  m.def("convolve2d_", convolve2d_<double>, py::arg("a"), py::arg("k"),
+        py::arg("out"), py::arg("mode") = "full", convolve2d_doc);
+  m.def("convolve2d_", convolve2d_<float>, py::arg("a"), py::arg("k"),
+        py::arg("out"), py::arg("mode") = "full", convolve2d_doc);
+
+  m.def("convolve3d", convolve3d<double>, py::arg("a"), py::arg("k"),
+        py::arg("mode") = "full", convolve3d_doc);
+  m.def("convolve3d", convolve3d<float>, py::arg("a"), py::arg("k"),
+        py::arg("mode") = "full", convolve3d_doc);
+  m.def("convolve3d_", convolve3d_<double>, py::arg("a"), py::arg("k"),
+        py::arg("out"), py::arg("mode") = "full", convolve3d_doc);
+  m.def("convolve3d_", convolve3d_<float>, py::arg("a"), py::arg("k"),
+        py::arg("out"), py::arg("mode") = "full", convolve3d_doc);
 
   m.def("oaconvolve", oaconvolve<double>, py::arg("a"), py::arg("k"),
         py::arg("mode") = "full", oaconvolve_doc);

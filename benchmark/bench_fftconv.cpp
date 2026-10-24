@@ -98,6 +98,113 @@ template <fftconv::Floating T> void BM_arma_conv_same(benchmark::State &state) {
 BENCHMARK(BM_arma_conv_same<double>)->ArgsProduct(ARGS_FIR);
 BENCHMARK(BM_arma_conv_same<float>)->ArgsProduct(ARGS_FIR);
 
+// ==========================================
+// 2D Convolution Benchmarks
+// ==========================================
+
+// Args: {rows, cols, krows, kcols}
+const std::vector<std::vector<int64_t>> ARGS_2D{{{64, 256}, {64, 256}, {5, 15}, {5, 15}}};
+
+template <fftconv::Floating T> void BM_convolve_2d_full(benchmark::State &state) {
+  const auto rows = static_cast<size_t>(state.range(0));
+  const auto cols = static_cast<size_t>(state.range(1));
+  const auto krows = static_cast<size_t>(state.range(2));
+  const auto kcols = static_cast<size_t>(state.range(3));
+  const auto orows = rows + krows - 1;
+  const auto ocols = cols + kcols - 1;
+
+  AlignedVector<T> a(rows * cols);
+  AlignedVector<T> k(krows * kcols);
+  AlignedVector<T> out(orows * ocols);
+
+  fftconv::convolve_fftw_2d<T, fftconv::Full>(a, rows, cols, k, krows, kcols, out, orows, ocols);
+  for (auto _ : state) {
+    fftconv::convolve_fftw_2d<T, fftconv::Full>(a, rows, cols, k, krows, kcols, out, orows, ocols);
+  }
+
+  state.SetItemsProcessed(state.iterations() * static_cast<int64_t>(rows * cols));
+  state.SetBytesProcessed(state.iterations() * static_cast<int64_t>(rows * cols) * sizeof(T));
+}
+BENCHMARK(BM_convolve_2d_full<double>)->ArgsProduct(ARGS_2D);
+BENCHMARK(BM_convolve_2d_full<float>)->ArgsProduct(ARGS_2D);
+
+template <fftconv::Floating T> void BM_convolve_2d_same(benchmark::State &state) {
+  const auto rows = static_cast<size_t>(state.range(0));
+  const auto cols = static_cast<size_t>(state.range(1));
+  const auto krows = static_cast<size_t>(state.range(2));
+  const auto kcols = static_cast<size_t>(state.range(3));
+
+  AlignedVector<T> a(rows * cols);
+  AlignedVector<T> k(krows * kcols);
+  AlignedVector<T> out(rows * cols);
+
+  fftconv::convolve_fftw_2d<T, fftconv::Same>(a, rows, cols, k, krows, kcols, out, rows, cols);
+  for (auto _ : state) {
+    fftconv::convolve_fftw_2d<T, fftconv::Same>(a, rows, cols, k, krows, kcols, out, rows, cols);
+  }
+
+  state.SetItemsProcessed(state.iterations() * static_cast<int64_t>(rows * cols));
+  state.SetBytesProcessed(state.iterations() * static_cast<int64_t>(rows * cols) * sizeof(T));
+}
+BENCHMARK(BM_convolve_2d_same<double>)->ArgsProduct(ARGS_2D);
+BENCHMARK(BM_convolve_2d_same<float>)->ArgsProduct(ARGS_2D);
+
+// ==========================================
+// 3D Convolution Benchmarks
+// ==========================================
+
+// Args: {depth, rows, cols, kdepth, krows, kcols}
+const std::vector<std::vector<int64_t>> ARGS_3D{{{16, 64}, {16, 64}, {16, 64}, {3}, {3}, {3}}};
+
+template <fftconv::Floating T> void BM_convolve_3d_full(benchmark::State &state) {
+  const auto depth = static_cast<size_t>(state.range(0));
+  const auto rows = static_cast<size_t>(state.range(1));
+  const auto cols = static_cast<size_t>(state.range(2));
+  const auto kdepth = static_cast<size_t>(state.range(3));
+  const auto krows = static_cast<size_t>(state.range(4));
+  const auto kcols = static_cast<size_t>(state.range(5));
+  const auto odepth = depth + kdepth - 1;
+  const auto orows = rows + krows - 1;
+  const auto ocols = cols + kcols - 1;
+
+  AlignedVector<T> a(depth * rows * cols);
+  AlignedVector<T> k(kdepth * krows * kcols);
+  AlignedVector<T> out(odepth * orows * ocols);
+
+  fftconv::convolve_fftw_3d<T, fftconv::Full>(a, depth, rows, cols, k, kdepth, krows, kcols, out, odepth, orows, ocols);
+  for (auto _ : state) {
+    fftconv::convolve_fftw_3d<T, fftconv::Full>(a, depth, rows, cols, k, kdepth, krows, kcols, out, odepth, orows, ocols);
+  }
+
+  state.SetItemsProcessed(state.iterations() * static_cast<int64_t>(depth * rows * cols));
+  state.SetBytesProcessed(state.iterations() * static_cast<int64_t>(depth * rows * cols) * sizeof(T));
+}
+BENCHMARK(BM_convolve_3d_full<double>)->ArgsProduct(ARGS_3D);
+BENCHMARK(BM_convolve_3d_full<float>)->ArgsProduct(ARGS_3D);
+
+template <fftconv::Floating T> void BM_convolve_3d_same(benchmark::State &state) {
+  const auto depth = static_cast<size_t>(state.range(0));
+  const auto rows = static_cast<size_t>(state.range(1));
+  const auto cols = static_cast<size_t>(state.range(2));
+  const auto kdepth = static_cast<size_t>(state.range(3));
+  const auto krows = static_cast<size_t>(state.range(4));
+  const auto kcols = static_cast<size_t>(state.range(5));
+
+  AlignedVector<T> a(depth * rows * cols);
+  AlignedVector<T> k(kdepth * krows * kcols);
+  AlignedVector<T> out(depth * rows * cols);
+
+  fftconv::convolve_fftw_3d<T, fftconv::Same>(a, depth, rows, cols, k, kdepth, krows, kcols, out, depth, rows, cols);
+  for (auto _ : state) {
+    fftconv::convolve_fftw_3d<T, fftconv::Same>(a, depth, rows, cols, k, kdepth, krows, kcols, out, depth, rows, cols);
+  }
+
+  state.SetItemsProcessed(state.iterations() * static_cast<int64_t>(depth * rows * cols));
+  state.SetBytesProcessed(state.iterations() * static_cast<int64_t>(depth * rows * cols) * sizeof(T));
+}
+BENCHMARK(BM_convolve_3d_same<double>)->ArgsProduct(ARGS_3D);
+BENCHMARK(BM_convolve_3d_same<float>)->ArgsProduct(ARGS_3D);
+
 // NOLINTEND(*-identifier-length)
 
 // BENCHMARK_MAIN();
