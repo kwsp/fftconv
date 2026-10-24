@@ -1,7 +1,8 @@
 #include <cassert>
+#include <chrono>
 #include <cstdlib>
-#include <fmt/core.h>
 #include <functional>
+#include <iostream>
 
 // Run the `callable` `n_runs` times and print the time.
 inline void timeit(const std::string &name,
@@ -13,5 +14,5 @@ inline void timeit(const std::string &name,
   }
   const auto elapsed =
       duration_cast<milliseconds>(high_resolution_clock::now() - start);
-  fmt::println("    ({} runs) {} took {}ms", n_runs, name, elapsed.count());
+  std::cout << "    (" << n_runs << " runs) " << name << " took " << elapsed.count() << "ms\n";
 }

@@ -5,7 +5,8 @@
 #include <fftconv/fftw.hpp>
 #include <span>
 
-// NOLINTBEGIN(*-pointer-arithmetic, *-magic-numbers)
+// NOLINTBEGIN(*-pointer-arithmetic, *-magic-numbers,
+// *-math-missing-parenthesis)
 
 namespace fftconv {
 
@@ -15,19 +16,19 @@ Uses FFTW's r2c transform
 */
 template <fftw::Floating T>
 void hilbert(const std::span<const T> x, const std::span<T> env) {
-  const auto n = x.size();
+  const size_t n = x.size();
   assert(n > 0);
   assert(x.size() == env.size());
 
   fftw::EngineR2C1D<T> &engine = fftw::EngineR2C1D<T>::get(n);
   fftw::R2CBuffer<T> &buf = engine.buf;
 
-  if (isSIMDAligned<64>(x.data())) {
+  if (isSIMDAligned<32>(x.data())) {
     // Avoid a copy
     engine.forward(x.data(), buf.out);
   } else {
     // Copy input to real buffer
-    for (int i = 0; i < n; ++i) {
+    for (size_t i = 0; i < n; ++i) {
       buf.in[i] = x[i];
     }
 
@@ -36,8 +37,8 @@ void hilbert(const std::span<const T> x, const std::span<T> env) {
   }
 
   // Multiply by 1j (skip DC and Nyquist)
-  const auto cx_size = n / 2 + 1;
-  for (auto i = 0; i < cx_size; ++i) {
+  const size_t cx_size = n / 2 + 1;
+  for (size_t i = 0; i < cx_size; ++i) {
     // Skip DC (0 Hz) and Nyquist (n/2 Hz when n is even)
     if (i == 0 || (n % 2 == 0 && i == cx_size - 1)) {
       buf.out[i][0] = 0.0;
@@ -56,7 +57,7 @@ void hilbert(const std::span<const T> x, const std::span<T> env) {
   // Take the abs of the analytic signal
   const T fct = static_cast<T>(1. / n);
 
-  for (auto i = 0; i < n; ++i) {
+  for (size_t i = 0; i < n; ++i) {
     const auto real = x[i];
     const auto imag = buf.in[i] * fct;
     env[i] = std::sqrt(real * real + imag * imag);
@@ -182,4 +183,4 @@ void hilbert(const std::span<const T> x, const std::span<T> env) {
 
 } // namespace fftconv
 
-// NOLINTEND(*-pointer-arithmetic, *-magic-numbers)
+// NOLINTEND(*-pointer-arithmetic, *-magic-numbers, *-math-missing-parenthesis)
